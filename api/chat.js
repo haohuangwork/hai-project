@@ -1,0 +1,53 @@
+export const config = { runtime: 'edge' };
+
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+export default async function handler(req) {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS });
+  }
+
+  if (req.method !== 'POST') {
+    return new Response('Method not allowed', { status: 405, headers: CORS });
+  }
+
+  const { messages, system } = await req.json();
+
+  const upstream = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      stream: true,
+      system,
+      messages,
+    }),
+  });
+
+  if (!upstream.ok) {
+    const err = await upstream.text();
+    return new Response(err, {
+      status: upstream.status,
+      headers: { ...CORS, 'Content-Type': 'application/json' },
+    });
+  }
+
+  return new Response(upstream.body, {
+    status: 200,
+    headers: {
+      ...CORS,
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'X-Accel-Buffering': 'no',
+    },
+  });
+}
