@@ -1,0 +1,2039 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SNAP Benefits</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@500&family=Inter:ital,wght@0,400;0,500;0,600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    .material-icons { font-size: 24px; line-height: 1; display: block; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #e2e8f0;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 480px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: #f8fafc;
+      box-shadow: 0 0 48px rgba(0,0,0,0.15);
+      overflow: hidden;
+    }
+
+    /* ─── Header ──────────────────────────────────────── */
+    .header {
+      background: #ffffff;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .header-text { flex: 1; }
+    .header-title {
+      font-family: 'Roboto Mono', 'Courier New', monospace;
+      font-weight: 500;
+      font-size: 20px;
+      color: #000;
+      line-height: 1.2;
+    }
+    .header-sub {
+      font-size: 12px;
+      font-weight: 400;
+      color: rgba(0,0,0,0.7);
+      margin-top: 2px;
+      line-height: 1.4;
+    }
+    .menu-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      border-radius: 8px;
+      color: #1e293b;
+    }
+    .menu-btn:hover { background: #f1f5f9; }
+
+    /* ─── Chat Area ────────────────────────────────────── */
+    .chat-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      scroll-behavior: smooth;
+    }
+
+    /* ─── Message Rows ─────────────────────────────────── */
+    .message { display: flex; flex-direction: column; width: 100%; }
+
+    /* Bot message */
+    .message.bot { align-items: flex-start; }
+    .msg-row {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      width: 100%;
+    }
+
+    /* Avatar */
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #d6f0f1;
+      color: #1c7a74;
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      letter-spacing: -0.5px;
+    }
+
+    /* Bot bubble */
+    .message.bot .bubble {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 16px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .bubble-text {
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1.4;
+      color: #1e293b;
+      word-break: break-word;
+    }
+    .msg-time {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      align-self: flex-end;
+      margin-left: auto;
+    }
+    .msg-time span {
+      font-size: 12px;
+      font-weight: 500;
+      color: #69737c;
+      letter-spacing: -0.06px;
+      white-space: nowrap;
+    }
+    .check-icon { display: block; flex-shrink: 0; }
+
+    /* User message */
+    .message.user { align-items: flex-end; }
+    .message.user .bubble {
+      background: #1e827d;
+      border-radius: 16px;
+      padding: 12px 16px;
+      max-width: 78%;
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      column-gap: 8px;
+      row-gap: 2px;
+    }
+    .message.user .bubble-text { flex: 1 1 auto; }
+    .message.user .bubble-text { color: #ffffff; }
+    .message.user .msg-time span { color: #aee8e6; }
+
+    /* ─── Quick Replies ────────────────────────────────── */
+    .quick-replies {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-left: 40px; /* avatar (32) + gap (8) */
+      width: 100%;
+      margin-top: 8px;
+    }
+    .qr-btn {
+      width: 100%;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      height: 44px;
+      padding: 0 16px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      color: #1e827d;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.15s;
+    }
+    .qr-btn:hover:not(:disabled) { background: #f0fdfa; }
+    .qr-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* ─── Typing Indicator ─────────────────────────────── */
+    .typing-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .typing-bubble {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 16px;
+    }
+    .typing-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #94a3b8;
+      animation: tdot 1.3s ease-in-out infinite;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.18s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.36s; }
+    @keyframes tdot {
+      0%, 60%, 100% { transform: translateY(0);    opacity: 0.35; }
+      30%            { transform: translateY(-5px); opacity: 1;    }
+    }
+
+    /* ─── Input Area ───────────────────────────────────── */
+    .input-area {
+      background: #f8fafc;
+      padding: 8px 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .input-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 24px;
+      padding: 16px;
+      box-shadow: 0 12px 16px -4px rgba(16,24,40,0.08), 0 4px 6px -2px rgba(16,24,40,0.04);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      transition: border-color 0.2s;
+    }
+    .input-card:focus-within {
+      border-color: #1E827D;
+    }
+    .msg-input {
+      width: 100%;
+      border: none;
+      outline: none;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 400;
+      color: #1e293b;
+      background: transparent;
+      resize: none;
+      min-height: 24px;
+      max-height: 120px;
+      line-height: 1.4;
+      overflow-y: auto;
+    }
+    .msg-input::placeholder { color: #475569; }
+    .msg-input:disabled { opacity: 0.5; }
+
+    .input-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .action-left { display: flex; gap: 8px; align-items: center; }
+
+    .icon-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 1px solid #cbd5e1;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #64748b;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .icon-btn:hover { background: #f8fafc; }
+
+    .send-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #065c58;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.2s, opacity 0.2s;
+    }
+    .send-btn:hover:not(:disabled) { background: #1e827d; }
+    .send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* Stop button shown during streaming */
+    .send-btn.stop-mode { background: #121212; }
+    .send-btn.stop-mode:hover { background: #2a2a2a; }
+
+    /* Voice recording indicator */
+    .icon-btn.recording {
+      background: #fef2f2;
+      border-color: #ef4444;
+      color: #ef4444;
+      animation: pulse-rec 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse-rec {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+      50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
+    }
+
+    /* File preview */
+    .file-preview:empty { display: none; }
+    .file-preview {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .file-preview-item {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #f1f5f9;
+      border-radius: 12px;
+      padding: 4px 8px;
+      font-size: 12px;
+      color: #1e293b;
+    }
+    .file-preview-item img {
+      width: 40px;
+      height: 40px;
+      object-fit: cover;
+      border-radius: 8px;
+    }
+    .file-preview-remove {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #1e293b;
+      color: white;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+
+    /* Streaming cursor on the active bubble */
+    .bubble-text.streaming::after {
+      content: '';
+      display: inline-block;
+      width: 2px;
+      height: 1em;
+      background: #1e827d;
+      margin-left: 2px;
+      vertical-align: text-bottom;
+      animation: blink 0.7s step-end infinite;
+    }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+    /* Message fade-in */
+    @keyframes msgIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .message { animation: msgIn 0.2s ease-out both; }
+
+    /* Error bubble */
+    .bubble-error {
+      background: #fef2f2;
+      border-color: #fecaca;
+      color: #991b1b;
+    }
+    .retry-btn {
+      margin-top: 8px;
+      background: none;
+      border: 1px solid #fca5a5;
+      border-radius: 8px;
+      color: #991b1b;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      cursor: pointer;
+    }
+    .retry-btn:hover { background: #fee2e2; }
+
+    .privacy-note {
+      text-align: center;
+      font-size: 12px;
+      font-weight: 400;
+      color: #757575;
+    }
+
+    /* ─── API Key Bar (bottom) ─────────────────────────── */
+    .api-bar {
+      background: #ffffff;
+      border-top: 1px solid #f1f5f9;
+      padding: 12px 16px;
+      flex-shrink: 0;
+    }
+    .api-form { display: flex; gap: 8px; }
+    .api-input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 13px;
+      color: #1e293b;
+      outline: none;
+      min-width: 0;
+    }
+    .api-input:focus { border-color: #1e827d; }
+    .api-save-btn {
+      background: #1e827d;
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .api-save-btn:hover { background: #065c58; }
+    .api-saved-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .api-saved-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: #1e293b;
+    }
+    .api-change-btn {
+      background: none;
+      border: none;
+      font-family: inherit;
+      font-size: 12px;
+      color: #1e827d;
+      text-decoration: underline;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    /* ─── Sources Chip (lives inside the bubble's time row) ── */
+    .sources-stack {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      width: 100%;
+    }
+    .sources-stack .msg-time {
+      flex: 1 0 0;
+      justify-content: flex-end;
+      align-self: auto;
+    }
+    .sources-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #eef3ef;
+      color: #000000;
+      border: none;
+      border-radius: 32px;
+      padding: 4px 8px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 400;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .sources-chip:hover { background: #ddeadf; }
+
+    /* ─── Sheet Overlay ────────────────────────────────── */
+    .sheet-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 100;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+    .sheet-overlay.open { opacity: 1; }
+
+    /* ─── Bottom Sheet ─────────────────────────────────── */
+    .sheet {
+      position: fixed;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%) translateY(100%);
+      width: 100%;
+      max-width: 480px;
+      max-height: 70vh;
+      background: #ffffff;
+      border-radius: 16px 16px 0 0;
+      z-index: 101;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 -4px 32px rgba(0,0,0,0.12);
+      transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .sheet.open { transform: translateX(-50%) translateY(0); }
+
+    .sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 16px 16px;
+      flex-shrink: 0;
+    }
+    .sheet-title {
+      font-size: 18px;
+      font-weight: 500;
+      color: #1e293b;
+      line-height: 1.4;
+    }
+    .sheet-close {
+      width: 24px;
+      height: 24px;
+      border: none;
+      background: none;
+      color: #1e293b;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      flex-shrink: 0;
+    }
+    .sheet-close:hover { opacity: 0.7; }
+    .sheet-body {
+      overflow-y: auto;
+      padding: 0 16px 32px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    /* ─── Source Cards ─────────────────────────────────── */
+    .source-card {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      padding: 12px 0;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      border-top: 1px solid #e2e8f0;
+      transition: opacity 0.15s;
+    }
+    .source-card:first-child { border-top: none; padding-top: 0; }
+    .source-card:hover { opacity: 0.75; }
+    .source-card-top {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .source-favicon {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      object-fit: contain;
+    }
+    .source-domain {
+      font-size: 12px;
+      font-weight: 400;
+      color: #69737c;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .source-title {
+      font-size: 16px;
+      font-weight: 500;
+      color: #1e293b;
+      line-height: 1.4;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .source-context {
+      font-size: 12px;
+      font-weight: 400;
+      color: #69737c;
+      line-height: 1.2;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    /* ─── Action Cards (Phase 3) ──────────────────────── */
+    .action-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+      padding-left: 40px;
+      margin-top: 8px;
+    }
+    .action-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 14px 16px;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      transition: background 0.15s, box-shadow 0.15s;
+      width: 100%;
+      text-align: left;
+      font-family: inherit;
+    }
+    .action-card:hover { background: #f0fdfa; box-shadow: 0 2px 8px rgba(0,0,0,0.10); }
+    .action-card:disabled { pointer-events: none; opacity: 0.5; }
+    .action-card-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: #d6f0f1;
+      color: #1c7a74;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .action-card-text { flex: 1; min-width: 0; }
+    .action-card-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1e293b;
+      line-height: 1.3;
+    }
+    .action-card-sub {
+      font-size: 12px;
+      font-weight: 400;
+      color: #69737c;
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .action-card-chevron { color: #94a3b8; flex-shrink: 0; font-size: 20px !important; }
+
+    /* ─── Booking: Service Select Cards ───────────────── */
+    .service-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-left: 40px;
+      margin-top: 8px;
+      width: 100%;
+    }
+    .service-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background: #ffffff;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 14px 16px;
+      cursor: pointer;
+      text-align: left;
+      font-family: inherit;
+      transition: border-color 0.15s, background 0.15s;
+      width: 100%;
+    }
+    .service-card:hover { border-color: #1e827d; background: #f0fdfa; }
+    .service-card.selected { border-color: #1e827d; background: #f0fdfa; }
+    .service-card.disabled { pointer-events: none; opacity: 0.5; }
+    .service-card-check {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 1.5px solid #cbd5e1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .service-card.selected .service-card-check {
+      background: #1e827d;
+      border-color: #1e827d;
+    }
+    .service-card-body { flex: 1; }
+    .service-card-title { font-size: 14px; font-weight: 600; color: #1e293b; line-height: 1.3; }
+    .service-card-dur { font-size: 12px; color: #69737c; margin-top: 2px; }
+
+    /* ─── Booking: Inline Input ────────────────────────── */
+    .booking-input-wrap {
+      padding-left: 40px;
+      margin-top: 8px;
+      width: 100%;
+    }
+    .booking-input-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: #69737c;
+      margin-bottom: 6px;
+    }
+    .booking-input-row {
+      display: flex;
+      gap: 8px;
+    }
+    .booking-input {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 12px;
+      font-family: inherit;
+      font-size: 14px;
+      color: #1e293b;
+      background: #ffffff;
+      outline: none;
+      transition: border-color 0.2s;
+      min-width: 0;
+    }
+    .booking-input:focus { border-color: #1e827d; }
+    .booking-next-btn {
+      padding: 10px 18px;
+      background: #1e827d;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .booking-next-btn:hover { background: #065c58; }
+    .booking-next-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+
+    /* ─── Booking: Summary & Complete ─────────────────── */
+    .booking-summary {
+      background: #ffffff;
+      border-left: 4px solid #1B4332;
+      border-radius: 0 16px 16px 0;
+      padding: 16px;
+      margin-top: 8px;
+      margin-left: 40px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .booking-summary-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1B4332;
+      margin-bottom: 12px;
+    }
+    .booking-summary-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .booking-summary-label {
+      color: #69737c;
+      font-weight: 500;
+      min-width: 100px;
+      flex-shrink: 0;
+    }
+    .booking-summary-val { color: #1e293b; font-weight: 500; }
+    .booking-complete-btn {
+      display: block;
+      width: calc(100% - 40px);
+      margin-left: 40px;
+      margin-top: 10px;
+      padding: 14px;
+      background: #1B4332;
+      color: white;
+      border: none;
+      border-radius: 16px;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.15s;
+    }
+    .booking-complete-btn:hover { background: #14532d; }
+    .booking-helper-text {
+      font-size: 11px;
+      color: #69737c;
+      text-align: center;
+      margin-top: 8px;
+      padding: 0 40px;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-text">
+      <div class="header-title">SNAP Benefits Assistant</div>
+      <div class="header-sub">Find out if you may qualify for food assistance.</div>
+    </div>
+    <button class="menu-btn" aria-label="Menu">
+      <span class="material-icons">menu</span>
+    </button>
+  </header>
+
+  <!-- Chat Area (aria-live so screen readers announce new messages) -->
+  <div class="chat-area" id="chatArea" role="log" aria-live="polite" aria-label="Conversation"></div>
+
+  <!-- Input Area -->
+  <div class="input-area">
+    <div class="input-card">
+      <textarea
+        class="msg-input"
+        id="msgInput"
+        placeholder="Type your message..."
+        rows="1"
+        disabled
+      ></textarea>
+      <div id="filePreview" class="file-preview"></div>
+      <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp,application/pdf" style="display:none">
+      <div class="input-actions">
+        <div class="action-left">
+          <button class="icon-btn" id="attachBtn" aria-label="Attach file" tabindex="-1">
+            <span class="material-icons">attach_file</span>
+          </button>
+          <button class="icon-btn" id="micBtn" aria-label="Voice input" tabindex="-1">
+            <span class="material-icons">mic</span>
+          </button>
+        </div>
+        <button class="send-btn" id="sendBtn" disabled aria-label="Send message">
+          <span class="material-icons" id="iconSend" style="color:white">arrow_upward</span>
+          <span class="material-icons" id="iconStop" style="color:white;display:none">stop</span>
+        </button>
+      </div>
+    </div>
+    <p class="privacy-note">Your answers and files are not stored or shared.</p>
+  </div>
+
+  <!-- API Key Bar (bottom) -->
+  <div class="api-bar">
+    <div class="api-form" id="apiForm">
+      <input
+        type="password"
+        class="api-input"
+        id="apiInput"
+        placeholder="Enter your Claude API key to begin..."
+        autocomplete="off"
+      />
+      <button class="api-save-btn" id="apiSaveBtn">Save</button>
+    </div>
+    <div class="api-saved-row" id="apiSavedRow" style="display:none">
+      <span class="api-saved-label">API key saved</span>
+      <button class="api-change-btn" id="apiChangeBtn">Change API key</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Sources bottom sheet (outside .app so it overlays the full viewport) -->
+<div id="sheetOverlay" class="sheet-overlay" style="display:none" aria-hidden="true"></div>
+<div id="sourceSheet" class="sheet" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <div class="sheet-header">
+    <h2 class="sheet-title" id="sheetTitle">Sources</h2>
+    <button class="sheet-close" id="sheetClose" aria-label="Close sources">
+      <span class="material-icons" style="font-size:24px">close</span>
+    </button>
+  </div>
+  <div class="sheet-body" id="sheetBody"></div>
+</div>
+
+<script>
+'use strict';
+
+// ── System Prompt ──────────────────────────────────────────────────────────────
+const SYSTEM_PROMPT = `You are a warm, knowledgeable friend helping someone find out if they qualify for SNAP food benefits in Texas. Be genuinely caring and non-judgmental. Never robotic or overly formal.
+
+TONE & STYLE RULES (follow these strictly):
+- Sound like a helpful friend, not a government form or customer service bot.
+- Keep every message to 1-2 short sentences MAX. Never more than 3 sentences.
+- Use contractions naturally: you're, don't, let's, that's, it's.
+- Never start two consecutive messages with the same word.
+- Vary your openers: "So,", "Good news!", "Let's see.", "That helps!", "Here's the thing:", "Makes sense.", "Okay,", "Got it.", etc.
+- NO bullet points in responses. Write in natural conversational sentences only.
+- Light encouragement is fine, but NEVER use "Amazing!", "Fantastic!", "Great job!", or any over-the-top praise.
+- NEVER use em dashes (the — character) anywhere in any response. Replace with a comma or a new sentence instead.
+- If something needs more than 2 sentences to explain, send two short messages by using a line break. Keep each part brief.
+
+JARGON RULES — always translate these:
+- "gross income" → "all the money you make before taxes come out"
+- "household" → "everyone you buy and cook food with"
+- "half-time enrollment" → "taking at least half the classes of a full-time student"
+- "work-study" → "work-study (a program where your school helps you find a part-time job)"
+- "TANF" → "TANF (a cash assistance program for families)"
+- "SSN" → "Social Security Number"
+- "enrollment verification" → "a letter or document from your school confirming you're enrolled"
+- Never use the word "household" without explaining it.
+
+FORMAT RULES:
+- For multiple-choice questions, end your message with OPTIONS:["Option A","Option B"] on its own line.
+- Tag phase transitions by starting the message with PHASE:2 or PHASE:3.
+- Always end with either a question or OPTIONS:[...] to keep the conversation moving.
+
+SNAP POLICY REFERENCE — FY2026 (Oct 1, 2025 - Sept 30, 2026):
+
+FEDERAL INCOME LIMITS (Source: USDA FNS):
+- Gross monthly income limit (130% FPL): 1=$1,696 | 2=$2,292 | 3=$2,888 | 4=$3,483 | 5=$4,079
+- Net monthly income limit (100% FPL): 1=$1,305 | 2=$1,763 | 3=$2,221 | 4=$2,680 | 5=$3,138
+- Asset limit: $3,000 for most households | $4,500 if someone is 60+ or has a disability
+
+MAXIMUM MONTHLY BENEFITS (Source: USDA FNS):
+- 1 person=$298 | 2=$546 | 3=$785 | 4=$994 | 5=$1,183
+
+TEXAS-SPECIFIC RULES (Source: Texas HHSC):
+- Apply at YourTexasBenefits.com or call 2-1-1
+- Applications processed within 30 days
+- Expedited SNAP within 7 days if monthly income under $150 and liquid resources under $100
+
+STUDENT RULES (Source: USDA FNS):
+- Students enrolled half-time or more in higher education are generally ineligible
+- Exemptions: working 20+ hrs/week, work-study offered by school, dependent child, disability, TANF
+- Continuing education, ESL, and workforce training are NOT subject to student rules
+
+UT AUSTIN RESOURCES:
+- UT Outpost SNAP Benefits: https://deanofstudents.utexas.edu/sos/ut-outpost-snap-benefits.php
+- Student Emergency Services: https://deanofstudents.utexas.edu/emergency
+- Central Texas Food Bank: https://www.centraltexasfoodbank.org
+
+CITATION RULES:
+- Whenever you share any income limits, benefit amounts, asset limits, or any policy numbers, you MUST end that message with a citation in this exact markdown format: [USDA FNS](https://www.fns.usda.gov/snap/recipient/eligibility)
+- For Texas-specific rules, cite: [Texas HHSC](https://www.hhs.texas.gov/snap)
+- For student rules, cite: [USDA FNS Student Rules](https://www.fns.usda.gov/snap/students)
+- Always include the citation even during the basic eligibility flow, not just for follow-up policy questions.
+- If unsure about a specific detail, direct to YourTexasBenefits.com or 2-1-1
+- Never make up policy details — only use what is in this reference
+
+PHASE 1 — STUDENT CHECK:
+Step 1: Ask what state they're in (open-ended, no OPTIONS).
+- Texas → note you're in the right place, continue to Step 2.
+- Other US state → mention this tool is built for Texas but you can still walk through the basics together, continue to Step 2.
+- Outside US → gently explain SNAP is a US program only, end warmly.
+
+Step 2: Ask if they're currently taking at least half the classes of a full-time student.
+OPTIONS:["Yes, I'm enrolled at least half-time","No, I'm taking fewer classes than that"]
+- Less than half-time → let them know the student rules don't apply to them, → PHASE 2.
+- Half-time or more → continue to Step 3.
+
+Step 3: Ask what kind of program they're in.
+OPTIONS:["A degree program (like a BA, BS, or graduate degree)","A vocational or trade school","Continuing ed, ESL, or a workforce training program"]
+- Continuing ed / ESL / workforce → let them know those programs don't trigger student restrictions → PHASE 2.
+- Degree or vocational → continue to Step 4.
+
+Step 4: Ask if their school requires them to have a meal plan.
+OPTIONS:["Yes, I have a required school meal plan","No, I don't have a school meal plan"]
+- No meal plan → PHASE 2.
+- Yes → continue to Step 5.
+
+Step 5: Explain briefly that a required meal plan can be a barrier, but there are exceptions. Ask which applies to them.
+OPTIONS:["I work 20+ hours a week","My school has a work-study program (and I qualify)","I have a child I'm responsible for","I have a documented disability","I get TANF (a cash assistance program for families)","None of these fit my situation"]
+- None → Gently explain they likely won't qualify because of the meal plan requirement. Mention UT Outpost, Central Texas Food Bank, and campus emergency aid as alternatives. End with warmth.
+- Any other → let them know that exception means they can keep going → PHASE 2.
+
+PHASE 2 — INCOME SNAPSHOT:
+Step 6: Start with PHASE:2. Ask how many people they buy and cook food with (including themselves).
+OPTIONS:["Just me","2 people","3 people","4 people","5 or more people"]
+
+Step 7: Share their gross income limit in plain language — "all the money coming in before taxes" — and ask where they fall.
+FY2026 gross monthly limits (before taxes): 1 person=$1,696 | 2=$2,292 | 3=$2,888 | 4=$3,483 | 5+=$4,079
+OPTIONS:["I make less than that","I make around that amount","I make clearly more than that"]
+- Clearly above → Explain they're likely over the limit for now. Mention UT Outpost, Central Texas Food Bank, and campus emergency aid. End warmly.
+- Below or around → Tell them it looks like they're likely eligible, give a rough maximum monthly benefit estimate (1 person up to $298, 2 up to $546, 3 up to $785, 4 up to $994), and move on → PHASE 3.
+
+PHASE 3 — NEXT STEPS:
+Step 8: Start with PHASE:3. Let them know what they'll need to apply: a letter from their school confirming they're enrolled, something showing their income (like a pay stub or financial aid letter), and their Social Security Number. Keep it brief and encouraging.
+
+Step 9: Ask what they'd like to do next.
+OPTIONS:["Let's start my application","I'd like help applying","Not right now"]
+- Start now → Send them to YourTexasBenefits.com and mention it takes about 30 minutes.
+- Need help → Give them 2-1-1 (or 1-855-366-3401) and mention UT Outpost on campus as a free resource.
+- Not right now → Validate that completely. Let them know they can come back whenever they're ready.`;
+
+// ── State ──────────────────────────────────────────────────────────────────────
+let history     = [];
+let loading     = false;
+let abortCtrl   = null;   // AbortController for the active stream
+
+// ── DOM refs ───────────────────────────────────────────────────────────────────
+const apiForm     = document.getElementById('apiForm');
+const apiInput    = document.getElementById('apiInput');
+const apiSaveBtn  = document.getElementById('apiSaveBtn');
+const apiSavedRow = document.getElementById('apiSavedRow');
+const apiChangeBtn= document.getElementById('apiChangeBtn');
+const chatArea    = document.getElementById('chatArea');
+const msgInput    = document.getElementById('msgInput');
+const sendBtn     = document.getElementById('sendBtn');
+const iconSend    = document.getElementById('iconSend');
+const iconStop    = document.getElementById('iconStop');
+const sheetOverlay = document.getElementById('sheetOverlay');
+const sourceSheet  = document.getElementById('sourceSheet');
+const sheetBody    = document.getElementById('sheetBody');
+const sheetClose   = document.getElementById('sheetClose');
+const attachBtn    = document.getElementById('attachBtn');
+const micBtn       = document.getElementById('micBtn');
+const fileInput    = document.getElementById('fileInput');
+const filePreview  = document.getElementById('filePreview');
+
+// ── Attachment State ──────────────────────────────────────────────────────────
+let pendingFile = null; // { type, media_type, data, name, previewUrl }
+
+// ── API Key ────────────────────────────────────────────────────────────────────
+function initApiKey() {
+  if (localStorage.getItem('snap_api_key')) {
+    showSaved();
+    startChat();
+  } else {
+    showForm();
+  }
+}
+
+function showForm() {
+  apiForm.style.display     = 'flex';
+  apiSavedRow.style.display = 'none';
+  msgInput.disabled = true;
+  sendBtn.disabled  = true;
+}
+
+function showSaved() {
+  apiForm.style.display     = 'none';
+  apiSavedRow.style.display = 'flex';
+  msgInput.disabled = false;
+}
+
+function saveApiKey() {
+  const key = apiInput.value.trim();
+  if (!key) return;
+  localStorage.setItem('snap_api_key', key);
+  apiInput.value = '';
+  showSaved();
+  startChat();
+}
+
+function resetApiKey() {
+  localStorage.removeItem('snap_api_key');
+  history = [];
+  chatArea.innerHTML = '';
+  setPhase(1);
+  showForm();
+}
+
+apiSaveBtn .addEventListener('click', saveApiKey);
+apiChangeBtn.addEventListener('click', resetApiKey);
+apiInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveApiKey(); });
+
+function setPhase() {}
+
+// ── Response Parsing ───────────────────────────────────────────────────────────
+function parseResponse(raw) {
+  let text = raw.trim();
+  let phase = null;
+  let options = [];
+
+  // PHASE tag at start
+  const phaseM = text.match(/^PHASE:(\d)\s*\n?/);
+  if (phaseM) {
+    phase = parseInt(phaseM[1]);
+    text  = text.slice(phaseM[0].length).trim();
+  }
+
+  // OPTIONS tag — strip citation links from a scratch copy first so a trailing
+  // [Text](url) citation on the same or next line doesn't break the match.
+  const textNoCitations = text.replace(/\s*\[[^\]]+\]\(https?:\/\/[^\)\s]+\)/g, '');
+  const optM = textNoCitations.match(/OPTIONS:\[(.+?)\]\s*$/m);
+  if (optM) {
+    try {
+      options = JSON.parse('[' + optM[1] + ']');
+    } catch {
+      options = optM[1]
+        .split(/",\s*"/)
+        .map(s => s.replace(/^"|"$/g, '').trim())
+        .filter(Boolean);
+    }
+    // Remove the OPTIONS token and anything trailing on that line (e.g. a citation)
+    text = text.replace(/\n?OPTIONS:\[.+?\][^\n]*$/m, '').trim();
+  }
+
+  return { phase, options, text };
+}
+
+// ── Citation Parsing ───────────────────────────────────────────────────────────
+function stripMarkdownLinks(text) {
+  return text.replace(/\s*\[([^\]]+)\]\(https?:\/\/[^\)\s]+\)/g, '');
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function extractDomain(url) {
+  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; }
+}
+
+function extractContext(raw, url) {
+  const escaped = url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = raw.match(new RegExp('.{0,160}' + escaped + '.{0,160}'));
+  if (!m) return '';
+  return stripMarkdownLinks(m[0]).trim();
+}
+
+function parseCitations(raw) {
+  const sources = [];
+  const seen = new Set();
+  const re = /\[([^\]]+)\]\((https?:\/\/[^\)\s]+)\)/g;
+  let m;
+  while ((m = re.exec(raw)) !== null) {
+    const [, title, url] = m;
+    if (seen.has(url)) continue;
+    seen.add(url);
+    sources.push({ url, title: title.trim(), domain: extractDomain(url), context: extractContext(raw, url) });
+  }
+  return sources;
+}
+
+function hasCitations(raw) {
+  return /According to/i.test(raw) || /\[[^\]]+\]\(https?:\/\/[^\)\s]+\)/.test(raw);
+}
+
+function buildSourcesChip(sources) {
+  const btn = document.createElement('button');
+  btn.className = 'sources-chip';
+  btn.innerHTML = `Sources<span class="material-icons" style="font-size:16px;line-height:1;display:inline-block;vertical-align:middle">keyboard_arrow_down</span>`;
+  btn.addEventListener('click', () => openSheet(sources));
+  return btn;
+}
+
+// ── Sources Sheet ──────────────────────────────────────────────────────────────
+function openSheet(sources) {
+  document.getElementById('sheetTitle').textContent = `${sources.length} source${sources.length !== 1 ? 's' : ''}`;
+  sheetBody.innerHTML = '';
+  sources.forEach(src => {
+    const a = document.createElement('a');
+    a.className = 'source-card';
+    a.href = src.url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.innerHTML = `
+      <div class="source-card-top">
+        <img class="source-favicon" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(src.domain)}&sz=32" alt="" aria-hidden="true">
+        <span class="source-domain">${esc(src.domain)}</span>
+      </div>
+      <div class="source-title">${esc(src.title)}</div>
+      ${src.context ? `<div class="source-context">${esc(src.context)}</div>` : ''}`;
+    sheetBody.appendChild(a);
+  });
+  sheetOverlay.style.display = 'block';
+  sourceSheet.setAttribute('aria-hidden', 'false');
+  requestAnimationFrame(() => {
+    sheetOverlay.classList.add('open');
+    sourceSheet.classList.add('open');
+  });
+}
+
+function closeSheet() {
+  sheetOverlay.classList.remove('open');
+  sourceSheet.classList.remove('open');
+  setTimeout(() => {
+    sheetOverlay.style.display = 'none';
+    sourceSheet.setAttribute('aria-hidden', 'true');
+  }, 300);
+}
+
+// ── Render Helpers ─────────────────────────────────────────────────────────────
+function nowTime() {
+  const d = new Date();
+  return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+const checkSVG = (color) => `<span class="material-icons check-icon" style="font-size:16px;color:${color}">done_all</span>`;
+
+function addMessage(role, text, options = []) {
+  const t = nowTime();
+  const wrap = document.createElement('div');
+  wrap.className = `message ${role}`;
+
+  if (role === 'bot') {
+    const msgRow = document.createElement('div');
+    msgRow.className = 'msg-row';
+    msgRow.innerHTML = `
+      <div class="avatar">SB</div>
+      <div class="bubble">
+        <p class="bubble-text"></p>
+        <div class="msg-time">
+          <span>${t}</span>
+          ${checkSVG('#94a3b8')}
+        </div>
+      </div>`;
+    msgRow.querySelector('.bubble-text').textContent = text;
+    wrap.appendChild(msgRow);
+
+    if (options.length > 0) {
+      const qrWrap = document.createElement('div');
+      qrWrap.className = 'quick-replies';
+      options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.className   = 'qr-btn';
+        btn.textContent = opt;
+        btn.addEventListener('click', () => {
+          qrWrap.querySelectorAll('.qr-btn').forEach(b => b.disabled = true);
+          handleUserMessage(opt);
+        });
+        qrWrap.appendChild(btn);
+      });
+      wrap.appendChild(qrWrap);
+    }
+  } else {
+    wrap.innerHTML = `
+      <div class="bubble">
+        <p class="bubble-text"></p>
+        <div class="msg-time">
+          <span>${t}</span>
+          ${checkSVG('#aee8e6')}
+        </div>
+      </div>`;
+    wrap.querySelector('.bubble-text').textContent = text;
+  }
+
+  chatArea.appendChild(wrap);
+  scrollBottom();
+}
+
+function showTyping() {
+  const wrap = document.createElement('div');
+  wrap.className = 'typing-wrap';
+  wrap.id = 'typing';
+  wrap.innerHTML = `
+    <div class="avatar">SB</div>
+    <div class="typing-bubble">
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+    </div>`;
+  chatArea.appendChild(wrap);
+  scrollBottom();
+}
+
+function hideTyping() {
+  const el = document.getElementById('typing');
+  if (el) el.remove();
+}
+
+// ── Smart auto-scroll ──────────────────────────────────────────────────────────
+// Only auto-scroll if the user hasn't manually scrolled up
+function isNearBottom() {
+  return chatArea.scrollHeight - chatArea.scrollTop - chatArea.clientHeight < 80;
+}
+function scrollBottom() {
+  chatArea.scrollTop = chatArea.scrollHeight;
+}
+function maybeScroll() {
+  if (isNearBottom()) scrollBottom();
+}
+
+// ── Stop button toggle ─────────────────────────────────────────────────────────
+function setStopMode(on) {
+  if (on) {
+    sendBtn.classList.add('stop-mode');
+    sendBtn.setAttribute('aria-label', 'Stop generating');
+    sendBtn.disabled = false;
+    iconSend.style.display = 'none';
+    iconStop.style.display = 'block';
+  } else {
+    sendBtn.classList.remove('stop-mode');
+    sendBtn.setAttribute('aria-label', 'Send message');
+    iconSend.style.display = 'block';
+    iconStop.style.display = 'none';
+  }
+}
+
+// ── Claude API Call (streaming) ────────────────────────────────────────────────
+function createBotBubble() {
+  const t = nowTime();
+  const wrap = document.createElement('div');
+  wrap.className = 'message bot';
+  wrap.setAttribute('aria-atomic', 'false');
+  const msgRow = document.createElement('div');
+  msgRow.className = 'msg-row';
+  msgRow.innerHTML = `
+    <div class="avatar" aria-hidden="true">SB</div>
+    <div class="bubble">
+      <p class="bubble-text streaming" aria-label="Assistant is typing"></p>
+      <div class="msg-time" aria-hidden="true">
+        <span>${t}</span>
+        ${checkSVG('#94a3b8')}
+      </div>
+    </div>`;
+  wrap.appendChild(msgRow);
+  return { wrap, msgRow, bubbleText: msgRow.querySelector('.bubble-text') };
+}
+
+function updateBubbleText(bubbleText, raw) {
+  bubbleText.textContent = stripMarkdownLinks(raw);
+}
+
+function finalizeMessage(wrap, msgRow, bubbleText, raw) {
+  bubbleText.classList.remove('streaming');
+  bubbleText.removeAttribute('aria-label');
+
+  const { phase, options, text } = parseResponse(raw);
+  bubbleText.textContent = stripMarkdownLinks(text);
+
+  if (phase === 3 && options.length > 0) {
+    renderActionCards(wrap);
+  } else if (options.length > 0) {
+    const qrWrap = document.createElement('div');
+    qrWrap.className = 'quick-replies';
+    qrWrap.setAttribute('role', 'group');
+    qrWrap.setAttribute('aria-label', 'Reply options');
+    options.forEach(opt => {
+      const btn = document.createElement('button');
+      btn.className = 'qr-btn';
+      btn.textContent = opt;
+      btn.addEventListener('click', () => {
+        qrWrap.querySelectorAll('.qr-btn').forEach(b => b.disabled = true);
+        handleUserMessage(opt);
+      });
+      qrWrap.appendChild(btn);
+    });
+    wrap.appendChild(qrWrap);
+  }
+
+  if (phase) setPhase(phase);
+
+  if (hasCitations(raw)) {
+    const citSources = parseCitations(raw);
+    if (citSources.length > 0) {
+      const bubble = msgRow.querySelector('.bubble');
+      const timeEl = bubble.querySelector('.msg-time');
+      const stack = document.createElement('div');
+      stack.className = 'sources-stack';
+      stack.appendChild(buildSourcesChip(citSources));
+      stack.appendChild(timeEl);
+      bubble.appendChild(stack);
+    }
+  }
+
+  scrollBottom();
+  loading = false;
+  setStopMode(false);
+  lockInput(false);
+  abortCtrl = null;
+}
+
+async function callAPI() {
+  const key = localStorage.getItem('snap_api_key');
+  if (!key) return;
+
+  if (abortCtrl) abortCtrl.abort();
+  abortCtrl = new AbortController();
+
+  loading = true;
+  lockInput(true);
+  setStopMode(true);
+  showTyping();
+
+  const { wrap, msgRow, bubbleText } = createBotBubble();
+  let raw        = '';
+  let firstChunk = true;
+  let revealed   = 0;
+  let streamDone = false;
+  let rafId      = null;
+
+  // Typewriter render loop — reveals characters at a smooth rate
+  function renderTick() {
+    if (revealed < raw.length) {
+      const backlog = raw.length - revealed;
+      const step = Math.max(2, Math.ceil(backlog * 0.15));
+      revealed = Math.min(revealed + step, raw.length);
+      bubbleText.textContent = stripMarkdownLinks(raw.slice(0, revealed));
+      scrollBottom();
+    }
+    if (!streamDone || revealed < raw.length) {
+      rafId = requestAnimationFrame(renderTick);
+    } else {
+      rafId = null;
+      history.push({ role: 'assistant', content: raw });
+      finalizeMessage(wrap, msgRow, bubbleText, raw);
+    }
+  }
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      signal: abortCtrl.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        stream: true,
+        system: SYSTEM_PROMPT,
+        messages: history
+      })
+    });
+
+    if (!response.ok) {
+      let msg = `HTTP ${response.status}`;
+      try { msg = (await response.json())?.error?.message || msg; } catch {}
+      throw new Error(msg);
+    }
+
+    const reader  = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // keep incomplete line in buffer
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') continue;
+
+        try {
+          const parsed = JSON.parse(data);
+
+          if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
+            const token = parsed.delta.text;
+            if (!token) continue;
+
+            if (firstChunk) {
+              hideTyping();
+              chatArea.appendChild(wrap);
+              scrollBottom();
+              firstChunk = false;
+              rafId = requestAnimationFrame(renderTick);
+            }
+
+            raw += token;
+          }
+
+          if (parsed.type === 'message_stop') {
+            streamDone = true;
+          }
+        } catch (e) { /* skip malformed chunks */ }
+      }
+    }
+
+    // If stream ended without message_stop
+    if (!streamDone) {
+      streamDone = true;
+      if (firstChunk) {
+        hideTyping();
+        loading = false;
+        setStopMode(false);
+        lockInput(false);
+        abortCtrl = null;
+      }
+    }
+
+  } catch (err) {
+    if (rafId) cancelAnimationFrame(rafId);
+
+    if (err.name === 'AbortError') {
+      // User hit Stop — flush remaining text and finalize
+      streamDone = true;
+      if (raw) {
+        revealed = raw.length;
+        bubbleText.textContent = stripMarkdownLinks(raw);
+        history.push({ role: 'assistant', content: raw });
+        finalizeMessage(wrap, msgRow, bubbleText, raw);
+      } else {
+        hideTyping();
+        loading = false;
+        setStopMode(false);
+        lockInput(false);
+        abortCtrl = null;
+      }
+    } else {
+      hideTyping();
+      const errWrap = document.createElement('div');
+      errWrap.className = 'message bot';
+      errWrap.innerHTML = `
+        <div class="msg-row">
+          <div class="avatar" aria-hidden="true">SB</div>
+          <div class="bubble bubble-error" role="alert">
+            <p class="bubble-text">Something went wrong: ${err.message}</p>
+            <button class="retry-btn">Try again</button>
+          </div>
+        </div>`;
+      errWrap.querySelector('.retry-btn').addEventListener('click', () => {
+        errWrap.remove();
+        callAPI();
+      });
+      chatArea.appendChild(errWrap);
+      scrollBottom();
+      loading = false;
+      setStopMode(false);
+      lockInput(false);
+      abortCtrl = null;
+    }
+  }
+}
+
+// ── User Input ─────────────────────────────────────────────────────────────────
+async function handleUserMessage(text) {
+  if (loading) return;
+
+  if (bookingState) {
+    addMessage('user', text);
+    handleBookingInput(text);
+    return;
+  }
+
+  addMessage('user', text);
+
+  if (pendingFile) {
+    const content = [
+      { type: pendingFile.type, source: { type: 'base64', media_type: pendingFile.media_type, data: pendingFile.data } },
+      { type: 'text', text: text || '(attached file)' }
+    ];
+    history.push({ role: 'user', content });
+    pendingFile = null;
+    renderFilePreview();
+  } else {
+    history.push({ role: 'user', content: text });
+  }
+
+  await callAPI();
+}
+
+async function sendMessage() {
+  const text = msgInput.value.trim();
+  if ((!text && !pendingFile) || loading) return;
+  msgInput.value = '';
+  resizeTextarea();
+  await handleUserMessage(text);
+}
+
+function lockInput(locked) {
+  msgInput.disabled = locked;
+  sendBtn.disabled  = locked || (!msgInput.value.trim() && !pendingFile);
+}
+
+function resizeTextarea() {
+  msgInput.style.height = 'auto';
+  msgInput.style.height = Math.min(msgInput.scrollHeight, 100) + 'px';
+  sendBtn.disabled = (!msgInput.value.trim() && !pendingFile) || loading;
+}
+
+msgInput.addEventListener('input',   resizeTextarea);
+msgInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+sendBtn.addEventListener('click', () => {
+  if (loading && abortCtrl) {
+    // Stop streaming
+    abortCtrl.abort();
+  } else {
+    sendMessage();
+  }
+});
+
+// ── Sheet event listeners ──────────────────────────────────────────────────────
+sheetClose.addEventListener('click', closeSheet);
+sheetOverlay.addEventListener('click', closeSheet);
+
+// ── Voice Input (Web Speech API) ──────────────────────────────────────────────
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (SpeechRecognition) {
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'en-US';
+  recognition.interimResults = true;
+  recognition.continuous = false;
+  let isRecording = false;
+
+  micBtn.addEventListener('click', () => {
+    if (isRecording) { recognition.stop(); return; }
+    recognition.start();
+  });
+  recognition.addEventListener('start', () => {
+    isRecording = true;
+    micBtn.classList.add('recording');
+  });
+  recognition.addEventListener('result', (e) => {
+    msgInput.value = Array.from(e.results).map(r => r[0].transcript).join('');
+    resizeTextarea();
+  });
+  recognition.addEventListener('end', () => {
+    isRecording = false;
+    micBtn.classList.remove('recording');
+  });
+  recognition.addEventListener('error', () => {
+    isRecording = false;
+    micBtn.classList.remove('recording');
+  });
+} else {
+  micBtn.style.display = 'none';
+}
+
+// ── File Upload ──────────────────────────────────────────────────────────────
+attachBtn.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', () => {
+  const file = fileInput.files[0];
+  if (!file) return;
+  fileInput.value = '';
+  const reader = new FileReader();
+  reader.onload = () => {
+    const base64 = reader.result.split(',')[1];
+    const isImage = file.type.startsWith('image/');
+    pendingFile = {
+      type: isImage ? 'image' : 'document',
+      media_type: file.type,
+      data: base64,
+      name: file.name,
+      previewUrl: isImage ? reader.result : null
+    };
+    renderFilePreview();
+  };
+  reader.readAsDataURL(file);
+});
+
+function renderFilePreview() {
+  filePreview.innerHTML = '';
+  if (!pendingFile) { resizeTextarea(); return; }
+
+  const item = document.createElement('div');
+  item.className = 'file-preview-item';
+  if (pendingFile.previewUrl) {
+    item.innerHTML = `<img src="${pendingFile.previewUrl}" alt="${esc(pendingFile.name)}">`;
+  } else {
+    item.innerHTML = `<span class="material-icons" style="font-size:20px">description</span><span>${esc(pendingFile.name)}</span>`;
+  }
+
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'file-preview-remove';
+  removeBtn.innerHTML = '<span class="material-icons" style="font-size:14px">close</span>';
+  removeBtn.addEventListener('click', () => {
+    pendingFile = null;
+    renderFilePreview();
+  });
+  item.appendChild(removeBtn);
+  filePreview.appendChild(item);
+  resizeTextarea();
+}
+
+// ── Action Cards (Phase 3) ────────────────────────────────────────────────────
+function renderActionCards(wrap) {
+  const cards = document.createElement('div');
+  cards.className = 'action-cards';
+
+  function makeCard(tag, icon, title, sub) {
+    const el = document.createElement(tag);
+    el.className = 'action-card';
+    el.innerHTML = `
+      <div class="action-card-icon"><span class="material-icons">${icon}</span></div>
+      <div class="action-card-text">
+        <div class="action-card-title">${esc(title)}</div>
+        <div class="action-card-sub">${esc(sub)}</div>
+      </div>
+      <span class="material-icons action-card-chevron">chevron_right</span>`;
+    return el;
+  }
+
+  // Card 1 — Call
+  const callCard = makeCard('a', 'phone', 'Call a SNAP Advisor', 'Texas Health & Human Services · 1-855-366-3401');
+  callCard.href = 'tel:1-855-366-3401';
+  cards.appendChild(callCard);
+
+  // Card 2 — Apply Online
+  const applyCard = makeCard('a', 'open_in_new', 'Start Your Application', 'YourTexasBenefits.com');
+  applyCard.href = 'https://yourtexasbenefits.com';
+  applyCard.target = '_blank';
+  applyCard.rel = 'noopener noreferrer';
+  cards.appendChild(applyCard);
+
+  // Card 3 — Book Appointment
+  const bookCard = makeCard('button', 'calendar_today', 'Meet with a UT Outpost Advisor', 'Schedule a free in-person appointment');
+  bookCard.addEventListener('click', () => {
+    cards.querySelectorAll('.action-card').forEach(c => { c.style.pointerEvents = 'none'; c.style.opacity = '0.6'; });
+    bookCard.style.opacity = '1';
+    startBookingFlow();
+  });
+  cards.appendChild(bookCard);
+
+  wrap.appendChild(cards);
+}
+
+// ── Booking Flow ──────────────────────────────────────────────────────────────
+let bookingState = null;
+
+// Helper: render a bot message bubble (no API)
+function botSay(text, appendFn) {
+  const t = nowTime();
+  const wrap = document.createElement('div');
+  wrap.className = 'message bot';
+  const msgRow = document.createElement('div');
+  msgRow.className = 'msg-row';
+  msgRow.innerHTML = `
+    <div class="avatar">SB</div>
+    <div class="bubble">
+      <p class="bubble-text"></p>
+      <div class="msg-time"><span>${t}</span>${checkSVG('#94a3b8')}</div>
+    </div>`;
+  msgRow.querySelector('.bubble-text').textContent = text;
+  wrap.appendChild(msgRow);
+  if (appendFn) appendFn(wrap);
+  chatArea.appendChild(wrap);
+  scrollBottom();
+}
+
+function botSayAfterTyping(text, appendFn, delay) {
+  showTyping();
+  setTimeout(() => { hideTyping(); botSay(text, appendFn); }, delay || 700);
+}
+
+function bookingUserSay(text) {
+  addMessage('user', text);
+}
+
+// Quick-reply helper for booking
+function makeQR(options, onPick) {
+  const qrWrap = document.createElement('div');
+  qrWrap.className = 'quick-replies';
+  options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'qr-btn';
+    btn.textContent = opt;
+    btn.addEventListener('click', () => {
+      qrWrap.querySelectorAll('.qr-btn').forEach(b => b.disabled = true);
+      onPick(opt);
+    });
+    qrWrap.appendChild(btn);
+  });
+  return qrWrap;
+}
+
+// Get next 7 weekdays from today
+function getWeekdays() {
+  const days = [];
+  const now = new Date();
+  let offset = 1;
+  while (days.length < 7) {
+    const d = new Date(now);
+    d.setDate(now.getDate() + offset);
+    if (d.getDay() !== 0 && d.getDay() !== 6) {
+      days.push(d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }));
+    }
+    offset++;
+  }
+  return days;
+}
+
+const TIME_SLOTS = ['9:00 AM', '10:00 AM', '11:00 AM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM'];
+
+function startBookingFlow() {
+  bookingState = {};
+  setTimeout(() => bookingStep1(), 200);
+}
+
+// STEP 1 — Service Type
+function bookingStep1() {
+  botSayAfterTyping("What type of appointment do you need?", (wrap) => {
+    const container = document.createElement('div');
+    container.className = 'service-cards';
+
+    const services = [
+      { key: 'quick', title: 'SNAP Benefits Quick Advising Session', dur: '25 minutes' },
+      { key: 'full',  title: 'SNAP Application Advising Session',    dur: '1 hour' }
+    ];
+
+    services.forEach(svc => {
+      const card = document.createElement('button');
+      card.className = 'service-card';
+      card.innerHTML = `
+        <div class="service-card-check">
+          <span class="material-icons" style="font-size:14px;color:white;display:none">check</span>
+        </div>
+        <div class="service-card-body">
+          <div class="service-card-title">${esc(svc.title)}</div>
+          <div class="service-card-dur">${esc(svc.dur)}</div>
+        </div>`;
+      card.addEventListener('click', () => {
+        if (bookingState.service) return;
+        bookingState.service = svc.title;
+        card.classList.add('selected');
+        card.querySelector('.material-icons').style.display = 'block';
+        container.querySelectorAll('.service-card').forEach(c => c.classList.add('disabled'));
+        bookingUserSay(svc.title);
+        setTimeout(() => bookingStep2(), 400);
+      });
+      container.appendChild(card);
+    });
+    wrap.appendChild(container);
+  });
+}
+
+// STEP 2 — Date
+function bookingStep2() {
+  const dates = getWeekdays();
+  const options = [...dates, 'None of these work'];
+  botSayAfterTyping("Which day works best for you this week?", (wrap) => {
+    wrap.appendChild(makeQR(options, (picked) => {
+      bookingUserSay(picked);
+      if (picked === 'None of these work') {
+        bookingStep2Custom();
+      } else {
+        bookingState.date = picked;
+        setTimeout(() => bookingStep3(), 400);
+      }
+    }));
+  });
+}
+
+// STEP 2b — Custom date text input
+function bookingStep2Custom() {
+  botSayAfterTyping("What date works for you? (e.g. April 15)", (wrap) => {
+    const inputWrap = document.createElement('div');
+    inputWrap.className = 'booking-input-wrap';
+    inputWrap.innerHTML = `
+      <div class="booking-input-row">
+        <input class="booking-input" type="text" placeholder="e.g. April 15" />
+        <button class="booking-next-btn">Next</button>
+      </div>`;
+    const inp = inputWrap.querySelector('input');
+    const btn = inputWrap.querySelector('button');
+    btn.addEventListener('click', () => {
+      const val = inp.value.trim();
+      if (!val) return;
+      inputWrap.remove();
+      bookingState.date = val;
+      bookingUserSay(val);
+      // Show time slots for custom date
+      botSayAfterTyping(`Here are the available times on ${val}. Which works for you?`, (w) => {
+        w.appendChild(makeQR(TIME_SLOTS, (time) => {
+          bookingState.time = time;
+          bookingUserSay(time);
+          setTimeout(() => bookingStep4(), 400);
+        }));
+      });
+    });
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') btn.click(); });
+    wrap.appendChild(inputWrap);
+  });
+}
+
+// STEP 3 — Time
+function bookingStep3() {
+  botSayAfterTyping("What time works best? All times are Central Time.", (wrap) => {
+    wrap.appendChild(makeQR(TIME_SLOTS, (time) => {
+      bookingState.time = time;
+      bookingUserSay(time);
+      setTimeout(() => bookingStep4(), 400);
+    }));
+  });
+}
+
+// Inline text input helper for steps 4-7
+function bookingAskText(label, placeholder, validate, onDone) {
+  botSayAfterTyping(label, (wrap) => {
+    const inputWrap = document.createElement('div');
+    inputWrap.className = 'booking-input-wrap';
+    inputWrap.innerHTML = `
+      <div class="booking-input-row">
+        <input class="booking-input" type="text" placeholder="${esc(placeholder)}" />
+        <button class="booking-next-btn">Next</button>
+      </div>
+      <div style="font-size:12px;color:#ef4444;margin-top:4px;display:none" class="booking-err"></div>`;
+    const inp = inputWrap.querySelector('input');
+    const btn = inputWrap.querySelector('button');
+    const err = inputWrap.querySelector('.booking-err');
+    btn.addEventListener('click', () => {
+      const val = inp.value.trim();
+      const errMsg = validate ? validate(val) : (!val ? 'This field is required.' : null);
+      if (errMsg) { err.textContent = errMsg; err.style.display = 'block'; return; }
+      inputWrap.remove();
+      bookingUserSay(val);
+      onDone(val);
+    });
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') btn.click(); });
+    wrap.appendChild(inputWrap);
+    setTimeout(() => inp.focus(), 100);
+  });
+}
+
+// STEP 4 — Full Name
+function bookingStep4() {
+  bookingAskText("What's your full name?", 'Full name', null, (val) => {
+    bookingState.name = val;
+    setTimeout(() => bookingStep5(), 400);
+  });
+}
+
+// STEP 5 — Email
+function bookingStep5() {
+  bookingAskText("What's your email address?", 'your@email.com', (val) => {
+    if (!val) return 'Email is required.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) return 'Please enter a valid email address.';
+    return null;
+  }, (val) => {
+    bookingState.email = val;
+    setTimeout(() => bookingStep6(), 400);
+  });
+}
+
+// STEP 6 — Phone
+function bookingStep6() {
+  bookingAskText("What's your phone number?", '(512) 555-0000', null, (val) => {
+    bookingState.phone = val;
+    setTimeout(() => bookingStep7(), 400);
+  });
+}
+
+// STEP 7 — EID
+function bookingStep7() {
+  bookingAskText("What's your UT EID?", 'e.g. ab12345', null, (val) => {
+    bookingState.eid = val;
+    setTimeout(() => bookingStep8(), 400);
+  });
+}
+
+// STEP 8 — Meeting Format
+function bookingStep8() {
+  botSayAfterTyping("How would you prefer to meet?", (wrap) => {
+    wrap.appendChild(makeQR(['In-person', 'Virtually via Teams'], (val) => {
+      bookingState.format = val;
+      bookingUserSay(val);
+      setTimeout(() => bookingStep9(), 400);
+    }));
+  });
+}
+
+// STEP 9 — SNAP Status
+function bookingStep9() {
+  botSayAfterTyping("Where are you in the SNAP process?", (wrap) => {
+    wrap.appendChild(makeQR(["I haven't applied yet","I applied and am waiting","I was denied","I currently receive SNAP","Other"], (val) => {
+      bookingState.snapStatus = val;
+      bookingUserSay(val);
+      setTimeout(() => bookingStep10(), 400);
+    }));
+  });
+}
+
+// STEP 10 — Peer Navigator
+function bookingStep10() {
+  botSayAfterTyping("Are you comfortable with a peer navigator in training sitting in on your session?", (wrap) => {
+    wrap.appendChild(makeQR(["Yes, that's fine", "No, I'd prefer privacy"], (val) => {
+      bookingState.peerNav = val;
+      bookingUserSay(val);
+      setTimeout(() => bookingStep11(), 400);
+    }));
+  });
+}
+
+// STEP 11 — Summary + Complete button
+function bookingStep11() {
+  botSayAfterTyping("Here's a summary of your booking. Review and complete below.", (wrap) => {
+    const s = bookingState;
+    const summary = document.createElement('div');
+    summary.className = 'booking-summary';
+    summary.innerHTML = `<div class="booking-summary-title">Booking Summary</div>` +
+      [
+        ['Service',          s.service],
+        ['Date',             s.date],
+        ['Time',             s.time + ' CT'],
+        ['Full Name',        s.name],
+        ['Email',            s.email],
+        ['Phone',            s.phone],
+        ['UT EID',           s.eid],
+        ['Meeting Format',   s.format],
+        ['SNAP Status',      s.snapStatus],
+        ['Peer Navigator',   s.peerNav],
+      ].map(([label, val]) => `
+        <div class="booking-summary-row">
+          <span class="booking-summary-label">${esc(label)}</span>
+          <span class="booking-summary-val">${esc(val || '')}</span>
+        </div>`).join('');
+    wrap.appendChild(summary);
+
+    const completeBtn = document.createElement('button');
+    completeBtn.className = 'booking-complete-btn';
+    completeBtn.textContent = 'Complete Booking';
+    completeBtn.addEventListener('click', () => {
+      window.open('https://outlook.office.com/book/SNAPBenefitsAdvising@utexas.onmicrosoft.com/', '_blank');
+    });
+    wrap.appendChild(completeBtn);
+
+    const helper = document.createElement('p');
+    helper.className = 'booking-helper-text';
+    helper.textContent = 'Use the info above to complete your booking on UT Outpost\'s page.';
+    wrap.appendChild(helper);
+
+    bookingState = null;
+  });
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+async function startChat() {
+  history = [{
+    role: 'user',
+    content: "Hi! I'd like to find out if I qualify for SNAP benefits."
+  }];
+  await callAPI();
+}
+
+initApiKey();
+</script>
+</body>
+</html>
