@@ -413,6 +413,36 @@
       font-variant-numeric: tabular-nums;
     }
 
+    /* ── Eligibility amount display ───────────────────── */
+    .benefit-amount {
+      display: flex;
+      align-items: baseline;
+      gap: 2px;
+      margin: 4px 0;
+    }
+    .benefit-amount-figure {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1e827d;
+      line-height: 1.4;
+    }
+    .benefit-amount-unit {
+      font-size: 14px;
+      font-weight: 500;
+      color: #1c7a74;
+      line-height: 1.4;
+    }
+    .benefit-list {
+      margin: 4px 0 0 21px;
+      padding: 0;
+      font-size: 14px;
+      color: #1e293b;
+      line-height: 1.4;
+    }
+    .benefit-list li {
+      margin-bottom: 2px;
+    }
+
     /* File preview */
     .file-preview:empty { display: none; }
     .file-preview {
@@ -1063,22 +1093,32 @@ Step 7 \u2014 Work Rules check (NON_STUDENT path only):
 "One more thing, SNAP has a work requirement for some adults. Do any of these apply to you?"
 OPTIONS:["I work or volunteer 80+ hours/month","I have a child under 18","I'm in a job training program","I'm 55 or older","I'm a student enrolled at least half-time","None of these apply"]
 - None \u2192 Explain work requirement makes them ineligible for now. Suggest campus resources and food bank. End warmly. STOP.
-- Any other \u2192 "You meet an exemption from the work requirement." \u2192 "You're very likely eligible for SNAP!" Give estimated max benefit. \u2192 go to PHASE 3
+- Any other \u2192 go to PHASE 3 (eligible result)
 
 PHASE 3 \u2014 NEXT STEPS:
 Tag this message with PHASE:3
 
-Step 8 \u2014 Documents needed:
-Tell them what they'll need (brief, encouraging):
-- A letter from your school confirming enrollment (if applicable)
-- Proof of income (pay stub or financial aid award letter)
-- Your Social Security Number
+When user is ELIGIBLE, output in this EXACT format — do not add any extra sentences, questions, or filler phrases like "What would you like to do next?":
 
-Step 9 \u2014 Next action:
-OPTIONS:["Start my application now","I need help applying","Not right now"]
-- Start now \u2192 Direct to YourTexasBenefits.com. Note it takes ~30 minutes. Offer to save a summary they can reference.
-- Need help \u2192 Share 1-855-366-3401 and mention UT Outpost can walk them through it in person. Show booking flow for UT Outpost appointment.
-- Not right now \u2192 Validate warmly. Offer to send a reminder to their email so they can come back when ready. Ask for their email address.
+[1-2 sentence eligibility confirmation only — no question at the end]
+
+AMOUNT:$XXX
+
+As a [N]-person household, you could receive up to $XXX per month in SNAP benefits. Your actual amount depends on your income and expenses. To complete your application, you'll need a few documents:
+LIST:
+1. Proof of income (like a recent pay stub)
+2. Your Social Security Number
+3. Bank statements (if you have savings accounts)
+END_LIST
+OPTIONS:["Let's start my application on TexasBenefits.com","I have more questions to ask UT Outpost advisor","Maybe not right now"]
+
+IMPORTANT: Copy the OPTIONS text above exactly — do not rephrase or paraphrase the button labels.
+
+Monthly benefit amounts: 1=$298 | 2=$546 | 3=$785 | 4=$994 | 5=$1,183
+
+- "Let's start my application" \u2192 Direct to YourTexasBenefits.com. Note it takes ~30 minutes.
+- "Speak with an advisor" \u2192 Share 1-855-366-3401 and mention UT Outpost can walk them through it in person.
+- "Maybe not right now" \u2192 Validate warmly. Offer to come back when ready.
 
 Always end with warmth. Remind them SNAP exists to help, there is no shame in applying.`;
 
@@ -1141,7 +1181,26 @@ function parseResponse(raw) {
     text = text.replace(/\n?OPTIONS:\[.+?\][^\n]*$/m, '').trim();
   }
 
-  return { phase, options, text };
+  // AMOUNT tag
+  let amount = null;
+  const amountM = text.match(/AMOUNT:\$(\d+)/);
+  if (amountM) {
+    amount = amountM[1];
+    text = text.replace(/\n?AMOUNT:\$\d+\n?/, '\n\n');
+  }
+
+  // LIST:.../END_LIST tag
+  let listItems = null;
+  const listM = text.match(/LIST:\n([\s\S]*?)\nEND_LIST/);
+  if (listM) {
+    listItems = listM[1]
+      .split('\n')
+      .map(l => l.replace(/^\d+\.\s*/, '').trim())
+      .filter(Boolean);
+    text = text.replace(/\n?LIST:\n[\s\S]*?\nEND_LIST\n?/, '');
+  }
+
+  return { phase, options, text, amount, listItems };
 }
 
 // Split text into (statement paragraph, question paragraph) for single-bubble rendering.
@@ -1165,9 +1224,7 @@ function splitAtQuestion(text) {
 
 // Attach quick-reply buttons or action cards to a message wrap element.
 function attachOptions(wrap, options, phase) {
-  if (phase === 3 && options.length > 0) {
-    renderActionCards(wrap);
-  } else if (options.length > 0) {
+  if (options.length > 0) {
     const qrWrap = document.createElement('div');
     qrWrap.className = 'quick-replies';
     qrWrap.setAttribute('role', 'group');
@@ -1429,7 +1486,7 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
   bubbleText.classList.remove('streaming');
   bubbleText.removeAttribute('aria-label');
 
-  const { phase, options, text } = parseResponse(raw);
+  const { phase, options, text, amount, listItems } = parseResponse(raw);
   if (phase) setPhase(phase);
 
   function done() {
@@ -1439,20 +1496,80 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
     abortCtrl = null;
   }
 
-  // Render as a single bubble. If there's a statement + question, separate with
-  // a blank line inside the bubble (two <p> elements) rather than two bubbles.
-  const split = splitAtQuestion(text);
-  if (split) {
+  if (amount) {
+    // ── Rich eligible result bubble ──────────────────────────────────────────
+    // Split on the blank line inserted where AMOUNT tag was
+    const parts = text.split(/\n\n+/);
+    const beforeAmount = stripMarkdownLinks((parts[0] || '').trim());
+    const afterAmount  = stripMarkdownLinks((parts.slice(1).join('\n\n')).trim());
+
     bubbleText.innerHTML = '';
-    const p1 = document.createElement('p');
-    p1.textContent = stripMarkdownLinks(split.part1);
-    const p2 = document.createElement('p');
-    p2.style.marginTop = '0.5em';
-    p2.textContent = stripMarkdownLinks(split.part2);
-    bubbleText.appendChild(p1);
-    bubbleText.appendChild(p2);
+
+    // Para 1 — eligibility confirmation
+    if (beforeAmount) {
+      const p1 = document.createElement('p');
+      p1.textContent = beforeAmount;
+      bubbleText.appendChild(p1);
+    }
+
+    // Amount display: $298 / month
+    const amountRow = document.createElement('div');
+    amountRow.className = 'benefit-amount';
+    amountRow.innerHTML = `<span class="benefit-amount-figure">$${amount}</span><span class="benefit-amount-unit"> / month</span>`;
+    bubbleText.appendChild(amountRow);
+
+    // Para 2 — explanation text
+    if (afterAmount) {
+      const p2 = document.createElement('p');
+      p2.textContent = afterAmount;
+      bubbleText.appendChild(p2);
+    }
+
+    // Numbered list
+    if (listItems && listItems.length > 0) {
+      const ol = document.createElement('ol');
+      ol.className = 'benefit-list';
+      listItems.forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = item;
+        ol.appendChild(li);
+      });
+      bubbleText.appendChild(ol);
+    }
+
+    // "What would you like to do next?" prompt
+    const nextP = document.createElement('p');
+    nextP.textContent = 'What would you like to do next?';
+    nextP.style.marginTop = '8px';
+    bubbleText.appendChild(nextP);
+
+    // Hardcoded sources chip + time inside bubble
+    const eligibleSources = [
+      { url: 'https://www.fns.usda.gov/snap/allotment/cola', title: 'USDA FNS Benefits', domain: 'fns.usda.gov', context: 'SNAP benefit allotment amounts by household size.' },
+      { url: 'https://www.fns.usda.gov/snap/recipient/eligibility', title: 'USDA FNS Eligibility', domain: 'fns.usda.gov', context: 'SNAP eligibility requirements and income limits.' },
+    ];
+    const bubble = msgRow.querySelector('.bubble');
+    const timeEl  = bubble.querySelector('.msg-time');
+    const stack = document.createElement('div');
+    stack.className = 'sources-stack';
+    stack.appendChild(buildSourcesChip(eligibleSources));
+    stack.appendChild(timeEl);
+    bubble.appendChild(stack);
   } else {
-    bubbleText.textContent = stripMarkdownLinks(text);
+    // ── Plain text bubble (normal or ineligible) ─────────────────────────────
+    const split = splitAtQuestion(text);
+    if (split) {
+      bubbleText.innerHTML = '';
+      const p1 = document.createElement('p');
+      p1.textContent = stripMarkdownLinks(split.part1);
+      const p2 = document.createElement('p');
+      p2.style.marginTop = '0.5em';
+      p2.textContent = stripMarkdownLinks(split.part2);
+      bubbleText.appendChild(p1);
+      bubbleText.appendChild(p2);
+    } else {
+      bubbleText.textContent = stripMarkdownLinks(text);
+    }
   }
 
   attachOptions(wrap, options, phase);
