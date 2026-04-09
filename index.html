@@ -302,16 +302,90 @@
     .send-btn.stop-mode { background: #121212; }
     .send-btn.stop-mode:hover { background: #2a2a2a; }
 
-    /* Voice recording indicator */
-    .icon-btn.recording {
-      background: #fef2f2;
-      border-color: #ef4444;
-      color: #ef4444;
-      animation: pulse-rec 1.5s ease-in-out infinite;
+    /* ── Voice input pill ─────────────────────────────── */
+    #micBtn {
+      transition: width 300ms cubic-bezier(0.4,0,0.2,1),
+                  border-radius 300ms cubic-bezier(0.4,0,0.2,1),
+                  padding 300ms cubic-bezier(0.4,0,0.2,1);
+      overflow: hidden;
+      flex-shrink: 0;
     }
-    @keyframes pulse-rec {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
-      50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
+    #micBtn .mic-icon {
+      transition: opacity 150ms cubic-bezier(0.4,0,0.2,1);
+      opacity: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #micBtn .voice-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      opacity: 0;
+      transition: opacity 150ms cubic-bezier(0.4,0,0.2,1);
+      pointer-events: none;
+      position: absolute;
+      left: 12px;
+      right: 12px;
+    }
+    #micBtn {
+      position: relative;
+    }
+    /* Active (recording) state */
+    #micBtn.recording {
+      width: 100%;
+      border-radius: 120px;
+      flex: 1;
+      padding: 8px 12px;
+      justify-content: space-between;
+      cursor: default;
+    }
+    #micBtn.recording .mic-icon {
+      opacity: 0;
+      pointer-events: none;
+    }
+    #micBtn.recording .voice-content {
+      opacity: 1;
+      pointer-events: auto;
+      transition-delay: 150ms;
+    }
+    /* Voice wave bars */
+    .voice-wave {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      height: 18px;
+    }
+    .vbar {
+      width: 2px;
+      border-radius: 80px;
+      flex-shrink: 0;
+    }
+    .vbar.active-bar {
+      transform-origin: center;
+      transition: transform 80ms ease-out, background-color 150ms ease;
+    }
+    .voice-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .voice-stop-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      color: #000;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .voice-timer {
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 400;
+      color: #000;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
     }
 
     /* File preview */
@@ -787,12 +861,26 @@
       <div id="filePreview" class="file-preview"></div>
       <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp,application/pdf" style="display:none">
       <div class="input-actions">
-        <div class="action-left">
+        <div class="action-left" style="flex:1;min-width:0;">
           <button class="icon-btn" id="attachBtn" aria-label="Attach file" tabindex="-1">
             <span class="material-icons">attach_file</span>
           </button>
           <button class="icon-btn" id="micBtn" aria-label="Voice input" tabindex="-1">
-            <span class="material-icons">mic</span>
+            <span class="mic-icon"><span class="material-icons">mic</span></span>
+            <span class="voice-content" aria-hidden="true">
+              <span class="voice-left">
+                <span class="voice-stop-label" id="voiceStopBtn">Stop</span>
+                <span class="voice-wave">
+                  <span class="vbar" style="height:8px;background:#d9d9d9"></span>
+                  <span class="vbar active-bar" style="height:18px;background:#1c7a74"></span>
+                  <span class="vbar active-bar" style="height:12px;background:#1c7a74"></span>
+                  <span class="vbar active-bar" style="height:10px;background:#1c7a74"></span>
+                  <span class="vbar" style="height:18px;background:#d9d9d9"></span>
+                  <span class="vbar" style="height:11px;background:#d9d9d9"></span>
+                </span>
+              </span>
+              <span class="voice-timer" id="voiceTimer">0:00</span>
+            </span>
           </button>
         </div>
         <button class="send-btn" id="sendBtn" disabled aria-label="Send message">
@@ -825,16 +913,20 @@
 // ── System Prompt ──────────────────────────────────────────────────────────────
 const SYSTEM_PROMPT = `You are a warm, knowledgeable friend helping someone find out if they qualify for SNAP food benefits in Texas. Be genuinely caring and non-judgmental. Never robotic or overly formal.
 
-TONE & STYLE RULES (follow these strictly):
-- Sound like a helpful friend, not a government form or customer service bot.
-- Keep every message to 1-2 short sentences MAX. Never more than 3 sentences.
-- Use contractions naturally: you're, don't, let's, that's, it's.
-- Never start two consecutive messages with the same word.
-- Vary your openers: "So,", "Good news!", "Let's see.", "That helps!", "Here's the thing:", "Makes sense.", "Okay,", "Got it.", etc.
-- NO bullet points in responses. Write in natural conversational sentences only.
-- Light encouragement is fine, but NEVER use "Amazing!", "Fantastic!", "Great job!", or any over-the-top praise.
+TONE:
+- Warm and friendly, but professional — like a knowledgeable friend, not a cheerleader
+- Never use filler phrases like "Of course!", "Absolutely!", "Great question!", "Sure thing!", "Know that..."
+- Do not start responses with the user's name
+- Avoid over-explaining — be direct and clear
+- Use natural transitions between acknowledgment and next question: "Got it." / "Makes sense." / "That helps." / "Good to know." — short, human, not performative
+- Contractions are encouraged: you're, don't, let's, that's
+- Never sound robotic or bureaucratic
 - NEVER use em dashes (the — character) anywhere in any response. Replace with a comma or a new sentence instead.
-- If something needs more than 2 sentences to explain, send two short messages by using a line break. Keep each part brief.
+
+STRUCTURE:
+- When responding, first briefly acknowledge what the user said (1 sentence max), then ask the next question
+- Keep the acknowledgment and question in the same message, separated by a line break
+- Total response should never exceed 3 sentences
 
 JARGON RULES — always translate these:
 - "gross income" → "all the money you make before taxes come out"
@@ -885,7 +977,7 @@ CITATION RULES:
 - Never make up policy details — only use what is in this reference
 
 PHASE 1 — STUDENT CHECK:
-Step 1: Ask what state they're in (open-ended, no OPTIONS).
+The user has already told you what state they're in. Respond to their state, then move directly to Step 2.
 - Texas → note you're in the right place, continue to Step 2.
 - Other US state → mention this tool is built for Texas but you can still walk through the basics together, continue to Step 2.
 - Outside US → gently explain SNAP is a US program only, end warmly.
@@ -967,6 +1059,10 @@ function parseResponse(raw) {
     text  = text.slice(phaseM[0].length).trim();
   }
 
+  // Strip any stray phase labels the model may include in the visible text
+  text = text.replace(/^PHASE:\d\s*\n?/gim, '').trim();
+  text = text.replace(/\bPhase\s+\d\b\s*[—\-–]?\s*/gi, '').trim();
+
   // OPTIONS tag — strip citation links from a scratch copy first so a trailing
   // [Text](url) citation on the same or next line doesn't break the match.
   const textNoCitations = text.replace(/\s*\[[^\]]+\]\(https?:\/\/[^\)\s]+\)/g, '');
@@ -985,6 +1081,62 @@ function parseResponse(raw) {
   }
 
   return { phase, options, text };
+}
+
+// Split text into (statement paragraph, question paragraph) for single-bubble rendering.
+// Returns { part1, part2 } if both parts exist, otherwise null.
+function splitAtQuestion(text) {
+  const marked = text.replace(/([.!?])\s+/g, '$1\x00');
+  const sentences = marked.split('\x00').map(s => s.trim()).filter(Boolean);
+  if (sentences.length < 2) return null;
+
+  let lastQIdx = -1;
+  for (let i = sentences.length - 1; i >= 0; i--) {
+    if (sentences[i].endsWith('?')) { lastQIdx = i; break; }
+  }
+  if (lastQIdx <= 0) return null;
+
+  const part1 = sentences.slice(0, lastQIdx).join(' ').trim();
+  const part2 = sentences.slice(lastQIdx).join(' ').trim();
+  if (!part1 || !part2) return null;
+  return { part1, part2 };
+}
+
+// Attach quick-reply buttons or action cards to a message wrap element.
+function attachOptions(wrap, options, phase) {
+  if (phase === 3 && options.length > 0) {
+    renderActionCards(wrap);
+  } else if (options.length > 0) {
+    const qrWrap = document.createElement('div');
+    qrWrap.className = 'quick-replies';
+    qrWrap.setAttribute('role', 'group');
+    qrWrap.setAttribute('aria-label', 'Reply options');
+    options.forEach(opt => {
+      const btn = document.createElement('button');
+      btn.className = 'qr-btn';
+      btn.textContent = opt;
+      btn.addEventListener('click', () => {
+        qrWrap.querySelectorAll('.qr-btn').forEach(b => b.disabled = true);
+        handleUserMessage(opt);
+      });
+      qrWrap.appendChild(btn);
+    });
+    wrap.appendChild(qrWrap);
+  }
+}
+
+// Attach inline source citations chip to a bubble if the raw text has links.
+function attachCitations(raw, wrap, msgRow) {
+  if (!hasCitations(raw)) return;
+  const citSources = parseCitations(raw);
+  if (citSources.length === 0) return;
+  const bubble = msgRow.querySelector('.bubble');
+  const timeEl  = bubble.querySelector('.msg-time');
+  const stack = document.createElement('div');
+  stack.className = 'sources-stack';
+  stack.appendChild(buildSourcesChip(citSources));
+  stack.appendChild(timeEl);
+  bubble.appendChild(stack);
 }
 
 // ── Citation Parsing ───────────────────────────────────────────────────────────
@@ -1094,7 +1246,18 @@ function addMessage(role, text, options = []) {
           ${checkSVG('#94a3b8')}
         </div>
       </div>`;
-    msgRow.querySelector('.bubble-text').textContent = text;
+    const bubbleTextEl = msgRow.querySelector('.bubble-text');
+    const paras = text.split('\n\n');
+    if (paras.length > 1) {
+      paras.forEach((p, i) => {
+        const el = document.createElement('p');
+        el.textContent = p;
+        if (i > 0) el.style.marginTop = '0.5em';
+        bubbleTextEl.appendChild(el);
+      });
+    } else {
+      bubbleTextEl.textContent = text;
+    }
     wrap.appendChild(msgRow);
 
     if (options.length > 0) {
@@ -1206,48 +1369,35 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
   bubbleText.removeAttribute('aria-label');
 
   const { phase, options, text } = parseResponse(raw);
-  bubbleText.textContent = stripMarkdownLinks(text);
-
-  if (phase === 3 && options.length > 0) {
-    renderActionCards(wrap);
-  } else if (options.length > 0) {
-    const qrWrap = document.createElement('div');
-    qrWrap.className = 'quick-replies';
-    qrWrap.setAttribute('role', 'group');
-    qrWrap.setAttribute('aria-label', 'Reply options');
-    options.forEach(opt => {
-      const btn = document.createElement('button');
-      btn.className = 'qr-btn';
-      btn.textContent = opt;
-      btn.addEventListener('click', () => {
-        qrWrap.querySelectorAll('.qr-btn').forEach(b => b.disabled = true);
-        handleUserMessage(opt);
-      });
-      qrWrap.appendChild(btn);
-    });
-    wrap.appendChild(qrWrap);
-  }
-
   if (phase) setPhase(phase);
 
-  if (hasCitations(raw)) {
-    const citSources = parseCitations(raw);
-    if (citSources.length > 0) {
-      const bubble = msgRow.querySelector('.bubble');
-      const timeEl = bubble.querySelector('.msg-time');
-      const stack = document.createElement('div');
-      stack.className = 'sources-stack';
-      stack.appendChild(buildSourcesChip(citSources));
-      stack.appendChild(timeEl);
-      bubble.appendChild(stack);
-    }
+  function done() {
+    loading = false;
+    setStopMode(false);
+    lockInput(false);
+    abortCtrl = null;
   }
 
+  // Render as a single bubble. If there's a statement + question, separate with
+  // a blank line inside the bubble (two <p> elements) rather than two bubbles.
+  const split = splitAtQuestion(text);
+  if (split) {
+    bubbleText.innerHTML = '';
+    const p1 = document.createElement('p');
+    p1.textContent = stripMarkdownLinks(split.part1);
+    const p2 = document.createElement('p');
+    p2.style.marginTop = '0.5em';
+    p2.textContent = stripMarkdownLinks(split.part2);
+    bubbleText.appendChild(p1);
+    bubbleText.appendChild(p2);
+  } else {
+    bubbleText.textContent = stripMarkdownLinks(text);
+  }
+
+  attachOptions(wrap, options, phase);
+  attachCitations(raw, wrap, msgRow);
   scrollBottom();
-  loading = false;
-  setStopMode(false);
-  lockInput(false);
-  abortCtrl = null;
+  done();
 }
 
 async function callAPI() {
@@ -1459,34 +1609,156 @@ sendBtn.addEventListener('click', () => {
 sheetClose.addEventListener('click', closeSheet);
 sheetOverlay.addEventListener('click', closeSheet);
 
-// ── Voice Input (Web Speech API) ──────────────────────────────────────────────
+// ── Voice Input (Web Speech API + Web Audio API) ───────────────────────────────
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const voiceStopBtn = document.getElementById('voiceStopBtn');
+const voiceTimer   = document.getElementById('voiceTimer');
+
 if (SpeechRecognition) {
   const recognition = new SpeechRecognition();
   recognition.lang = 'en-US';
   recognition.interimResults = true;
   recognition.continuous = false;
-  let isRecording = false;
+
+  let isRecording   = false;
+  let timerInterval = null;
+  let timerSeconds  = 0;
+
+  // Web Audio API state
+  let audioCtx      = null;
+  let analyser      = null;
+  let micStream     = null;
+  let animRafId     = null;
+  const dataArray   = new Uint8Array(256);
+
+  // Active bar elements (bars 2, 3, 4 — 0-indexed: 1, 2, 3)
+  const voiceBars = micBtn.querySelectorAll('.vbar');
+  const activeBars = [voiceBars[1], voiceBars[2], voiceBars[3]];
+  const multipliers = [1.0, 0.8, 0.6];
+
+  function startTimer() {
+    timerSeconds = 0;
+    voiceTimer.textContent = '0:00';
+    timerInterval = setInterval(() => {
+      timerSeconds++;
+      const m = Math.floor(timerSeconds / 60);
+      const s = String(timerSeconds % 60).padStart(2, '0');
+      voiceTimer.textContent = `${m}:${s}`;
+    }, 1000);
+  }
+
+  function stopTimer() {
+    clearInterval(timerInterval);
+    timerInterval = null;
+    timerSeconds  = 0;
+    voiceTimer.textContent = '0:00';
+  }
+
+  function resetBars() {
+    activeBars.forEach(bar => {
+      bar.style.transform = 'scaleY(0.3)';
+      bar.style.backgroundColor = '#d9d9d9';
+    });
+  }
+
+  function animateBars() {
+    if (!analyser) return;
+    analyser.getByteFrequencyData(dataArray);
+
+    // Average the lower frequency bins for a voice-appropriate reading
+    let sum = 0;
+    const binCount = 32;
+    for (let i = 0; i < binCount; i++) sum += dataArray[i];
+    const avg = sum / binCount;
+
+    const SILENCE_THRESHOLD = 10;
+    if (avg < SILENCE_THRESHOLD) {
+      resetBars();
+    } else {
+      // Map avg (0-255) to scale (0.3-1.0)
+      const scale = 0.3 + (avg / 255) * 0.7;
+      activeBars.forEach((bar, i) => {
+        const barScale = Math.min(scale * multipliers[i], 1.0);
+        bar.style.transform = `scaleY(${Math.max(barScale, 0.3)})`;
+        bar.style.backgroundColor = '#1c7a74';
+      });
+    }
+
+    animRafId = requestAnimationFrame(animateBars);
+  }
+
+  async function startAudio() {
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      audioCtx  = new (window.AudioContext || window.webkitAudioContext)();
+      analyser  = audioCtx.createAnalyser();
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.6;
+      const source = audioCtx.createMediaStreamSource(micStream);
+      source.connect(analyser);
+      animateBars();
+    } catch (e) {
+      // Microphone permission denied — bars stay static, recognition still works
+    }
+  }
+
+  function stopAudio() {
+    if (animRafId) { cancelAnimationFrame(animRafId); animRafId = null; }
+    if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+    if (audioCtx)  { audioCtx.close(); audioCtx = null; }
+    analyser = null;
+    resetBars();
+  }
+
+  function enterVoiceMode() {
+    micBtn.setAttribute('aria-label', 'Stop recording');
+    micBtn.classList.add('recording');
+    startTimer();
+    startAudio();
+  }
+
+  function exitVoiceMode() {
+    micBtn.classList.remove('recording');
+    micBtn.setAttribute('aria-label', 'Voice input');
+    stopTimer();
+    stopAudio();
+    // Fade transcript in
+    msgInput.style.opacity = '0';
+    requestAnimationFrame(() => {
+      msgInput.style.transition = 'opacity 200ms';
+      msgInput.style.opacity = '1';
+      setTimeout(() => { msgInput.style.transition = ''; }, 250);
+    });
+  }
 
   micBtn.addEventListener('click', () => {
     if (isRecording) { recognition.stop(); return; }
     recognition.start();
   });
+
+  voiceStopBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (isRecording) recognition.stop();
+  });
+
   recognition.addEventListener('start', () => {
     isRecording = true;
-    micBtn.classList.add('recording');
+    enterVoiceMode();
   });
+
   recognition.addEventListener('result', (e) => {
     msgInput.value = Array.from(e.results).map(r => r[0].transcript).join('');
     resizeTextarea();
   });
+
   recognition.addEventListener('end', () => {
     isRecording = false;
-    micBtn.classList.remove('recording');
+    exitVoiceMode();
   });
+
   recognition.addEventListener('error', () => {
     isRecording = false;
-    micBtn.classList.remove('recording');
+    exitVoiceMode();
   });
 } else {
   micBtn.style.display = 'none';
@@ -1890,12 +2162,11 @@ function bookingStep11() {
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────────
-async function startChat() {
-  history = [{
-    role: 'user',
-    content: "Hi! I'd like to find out if I qualify for SNAP benefits."
-  }];
-  await callAPI();
+function startChat() {
+  history = [];
+  const greeting = "Hi! I'm your SNAP Benefits Assistant. I'm here to help you understand the application process and figure out if you qualify.\n\nTo make sure I give you the most accurate information, what state are you currently living in?";
+  addMessage('bot', greeting);
+  history.push({ role: 'assistant', content: greeting });
 }
 
 msgInput.disabled = false;
