@@ -175,17 +175,22 @@
       background: #ffffff;
       border: 1px solid #e2e8f0;
       border-radius: 16px;
-      height: 44px;
-      padding: 0 16px;
+      min-height: 44px;
+      padding: 16px;
       font-family: inherit;
       font-size: 14px;
       font-weight: 600;
       color: #1e827d;
       cursor: pointer;
       text-align: left;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      text-decoration: none;
       transition: background 0.15s;
     }
-    .qr-btn:hover:not(:disabled) { background: #f0fdfa; }
+    .qr-btn:hover:not(:disabled) { background: #f0fdfa; text-decoration: none; }
+    .qr-btn:hover, .qr-btn:visited, .qr-btn:active { color: #1e827d; text-decoration: none; }
     .qr-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
     /* ─── Typing Indicator ─────────────────────────────── */
@@ -414,6 +419,8 @@
     }
 
     /* ── Eligibility amount display ───────────────────── */
+    .advisor-link { color: #1e827d; text-decoration: none; }
+    .advisor-link:hover { text-decoration: underline; }
     .benefit-amount {
       display: flex;
       align-items: baseline;
@@ -1117,7 +1124,18 @@ IMPORTANT: Copy the OPTIONS text above exactly — do not rephrase or paraphrase
 Monthly benefit amounts: 1=$298 | 2=$546 | 3=$785 | 4=$994 | 5=$1,183
 
 - "Let's start my application" \u2192 Direct to YourTexasBenefits.com. Note it takes ~30 minutes.
-- "Speak with an advisor" \u2192 Share 1-855-366-3401 and mention UT Outpost can walk them through it in person.
+- "I have more questions to ask UT Outpost advisor" \u2192 Output this EXACT format, no deviations:
+
+ADVISOR:1
+Got it. UT Outpost advisors can walk you through the full application in person.
+
+UT Outpost Details:
+- Location: Student Services Building (SSB), Ground Floor
+- Website: https://deanofstudents.utexas.edu/emergency/utoutpost.php
+
+To schedule an appointment, you can:
+OPTIONS:["Book SNAP advising session","Call to book an appointment \u2014 512-471-6242"]
+
 - "Maybe not right now" \u2192 Validate warmly. Offer to come back when ready.
 
 Always end with warmth. Remind them SNAP exists to help, there is no shame in applying.`;
@@ -1200,7 +1218,12 @@ function parseResponse(raw) {
     text = text.replace(/\n?LIST:\n[\s\S]*?\nEND_LIST\n?/, '');
   }
 
-  return { phase, options, text, amount, listItems };
+  // ADVISOR tag
+  let advisor = false;
+  const advisorM = text.match(/^ADVISOR:1\s*\n?/);
+  if (advisorM) { advisor = true; text = text.slice(advisorM[0].length).trim(); }
+
+  return { phase, options, text, amount, listItems, advisor };
 }
 
 // Split text into (statement paragraph, question paragraph) for single-bubble rendering.
@@ -1223,12 +1246,28 @@ function splitAtQuestion(text) {
 }
 
 // Attach quick-reply buttons or action cards to a message wrap element.
-function attachOptions(wrap, options, phase) {
-  if (options.length > 0) {
-    const qrWrap = document.createElement('div');
-    qrWrap.className = 'quick-replies';
-    qrWrap.setAttribute('role', 'group');
-    qrWrap.setAttribute('aria-label', 'Reply options');
+function attachOptions(wrap, options, phase, advisor = false) {
+  if (options.length === 0) return;
+  const qrWrap = document.createElement('div');
+  qrWrap.className = 'quick-replies';
+  qrWrap.setAttribute('role', 'group');
+  qrWrap.setAttribute('aria-label', 'Reply options');
+
+  if (advisor) {
+    // Advisor-specific buttons — rendered as links, not chat messages
+    const advisorActions = [
+      { text: 'Book SNAP advising session', href: 'https://outlook.office.com/book/SNAPBenefitsAdvising@utexas.onmicrosoft.com/', tel: false },
+      { text: 'Call to book an appointment \u2014 512-471-6242', href: 'tel:512-471-6242', tel: true },
+    ];
+    advisorActions.forEach(action => {
+      const a = document.createElement('a');
+      a.className = 'qr-btn';
+      a.textContent = action.text;
+      a.href = action.href;
+      if (!action.tel) { a.target = '_blank'; a.rel = 'noopener noreferrer'; }
+      qrWrap.appendChild(a);
+    });
+  } else {
     options.forEach(opt => {
       const btn = document.createElement('button');
       btn.className = 'qr-btn';
@@ -1239,8 +1278,8 @@ function attachOptions(wrap, options, phase) {
       });
       qrWrap.appendChild(btn);
     });
-    wrap.appendChild(qrWrap);
   }
+  wrap.appendChild(qrWrap);
 }
 
 // Attach inline source citations chip to a bubble if the raw text has links.
@@ -1486,7 +1525,7 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
   bubbleText.classList.remove('streaming');
   bubbleText.removeAttribute('aria-label');
 
-  const { phase, options, text, amount, listItems } = parseResponse(raw);
+  const { phase, options, text, amount, listItems, advisor } = parseResponse(raw);
   if (phase) setPhase(phase);
 
   function done() {
@@ -1496,7 +1535,57 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
     abortCtrl = null;
   }
 
-  if (amount) {
+  if (advisor) {
+    // ── Advisor info bubble ──────────────────────────────────────────────────
+    bubbleText.innerHTML = '';
+
+    // Intro paragraph
+    const intro = document.createElement('p');
+    intro.textContent = 'Got it. UT Outpost advisors can walk you through the full application in person.';
+    bubbleText.appendChild(intro);
+
+    // "UT Outpost Details:" label
+    const detailsLabel = document.createElement('p');
+    detailsLabel.style.marginTop = '8px';
+    detailsLabel.style.fontWeight = '600';
+    detailsLabel.textContent = 'UT Outpost Details:';
+    bubbleText.appendChild(detailsLabel);
+
+    // Location — Google Maps link
+    const locP = document.createElement('p');
+    locP.style.marginTop = '4px';
+    const locA = document.createElement('a');
+    locA.href = 'https://maps.google.com/?q=Student+Services+Building+UT+Austin+Texas';
+    locA.target = '_blank';
+    locA.rel = 'noopener noreferrer';
+    locA.textContent = 'Student Services Building (SSB), Ground Floor';
+    locA.className = 'advisor-link';
+    locP.appendChild(locA);
+    bubbleText.appendChild(locP);
+
+    // Website link
+    const webP = document.createElement('p');
+    webP.style.marginTop = '4px';
+    const webA = document.createElement('a');
+    webA.href = 'https://deanofstudents.utexas.edu/emergency/utoutpost.php';
+    webA.target = '_blank';
+    webA.rel = 'noopener noreferrer';
+    webA.textContent = 'deanofstudents.utexas.edu/emergency/utoutpost.php';
+    webA.className = 'advisor-link';
+    webP.appendChild(webA);
+    bubbleText.appendChild(webP);
+
+    // Schedule prompt
+    const schedP = document.createElement('p');
+    schedP.style.marginTop = '8px';
+    schedP.textContent = 'To schedule an appointment, you can:';
+    bubbleText.appendChild(schedP);
+
+    attachOptions(wrap, options, phase, true);
+    scrollBottom();
+    done();
+    return;
+  } else if (amount) {
     // ── Rich eligible result bubble ──────────────────────────────────────────
     // Split on the blank line inserted where AMOUNT tag was
     const parts = text.split(/\n\n+/);
@@ -1556,7 +1645,7 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
     stack.appendChild(timeEl);
     bubble.appendChild(stack);
   } else {
-    // ── Plain text bubble (normal or ineligible) ─────────────────────────────
+    // ── Plain text bubble (normal or ineligible) ────────────────────────────
     const split = splitAtQuestion(text);
     if (split) {
       bubbleText.innerHTML = '';
@@ -1727,12 +1816,6 @@ async function callAPI() {
 // ── User Input ─────────────────────────────────────────────────────────────────
 async function handleUserMessage(text) {
   if (loading) return;
-
-  if (bookingState) {
-    addMessage('user', text);
-    handleBookingInput(text);
-    return;
-  }
 
   addMessage('user', text);
 
@@ -2037,315 +2120,7 @@ function renderActionCards(wrap) {
   wrap.appendChild(cards);
 }
 
-// ── Booking Flow ──────────────────────────────────────────────────────────────
-let bookingState = null;
-
-// Helper: render a bot message bubble (no API)
-function botSay(text, appendFn) {
-  const t = nowTime();
-  const wrap = document.createElement('div');
-  wrap.className = 'message bot';
-  const msgRow = document.createElement('div');
-  msgRow.className = 'msg-row';
-  msgRow.innerHTML = `
-    <div class="avatar">SB</div>
-    <div class="bubble">
-      <p class="bubble-text"></p>
-      <div class="msg-time"><span>${t}</span>${checkSVG('#94a3b8')}</div>
-    </div>`;
-  msgRow.querySelector('.bubble-text').textContent = text;
-  wrap.appendChild(msgRow);
-  if (appendFn) appendFn(wrap);
-  chatArea.appendChild(wrap);
-  scrollBottom();
-}
-
-function botSayAfterTyping(text, appendFn, delay) {
-  showTyping();
-  setTimeout(() => { hideTyping(); botSay(text, appendFn); }, delay || 700);
-}
-
-function bookingUserSay(text) {
-  addMessage('user', text);
-}
-
-// Quick-reply helper for booking
-function makeQR(options, onPick) {
-  const qrWrap = document.createElement('div');
-  qrWrap.className = 'quick-replies';
-  options.forEach(opt => {
-    const btn = document.createElement('button');
-    btn.className = 'qr-btn';
-    btn.textContent = opt;
-    btn.addEventListener('click', () => {
-      qrWrap.querySelectorAll('.qr-btn').forEach(b => b.disabled = true);
-      onPick(opt);
-    });
-    qrWrap.appendChild(btn);
-  });
-  return qrWrap;
-}
-
-// Get next 7 weekdays from today
-function getWeekdays() {
-  const days = [];
-  const now = new Date();
-  let offset = 1;
-  while (days.length < 7) {
-    const d = new Date(now);
-    d.setDate(now.getDate() + offset);
-    if (d.getDay() !== 0 && d.getDay() !== 6) {
-      days.push(d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }));
-    }
-    offset++;
-  }
-  return days;
-}
-
-const TIME_SLOTS = ['9:00 AM', '10:00 AM', '11:00 AM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM'];
-
-function startBookingFlow() {
-  bookingState = {};
-  setTimeout(() => bookingStep1(), 200);
-}
-
-// STEP 1 — Service Type
-function bookingStep1() {
-  botSayAfterTyping("What type of appointment do you need?", (wrap) => {
-    const container = document.createElement('div');
-    container.className = 'service-cards';
-
-    const services = [
-      { key: 'quick', title: 'SNAP Benefits Quick Advising Session', dur: '25 minutes' },
-      { key: 'full',  title: 'SNAP Application Advising Session',    dur: '1 hour' }
-    ];
-
-    services.forEach(svc => {
-      const card = document.createElement('button');
-      card.className = 'service-card';
-      card.innerHTML = `
-        <div class="service-card-check">
-          <span class="material-icons" style="font-size:14px;color:white;display:none">check</span>
-        </div>
-        <div class="service-card-body">
-          <div class="service-card-title">${esc(svc.title)}</div>
-          <div class="service-card-dur">${esc(svc.dur)}</div>
-        </div>`;
-      card.addEventListener('click', () => {
-        if (bookingState.service) return;
-        bookingState.service = svc.title;
-        card.classList.add('selected');
-        card.querySelector('.material-icons').style.display = 'block';
-        container.querySelectorAll('.service-card').forEach(c => c.classList.add('disabled'));
-        bookingUserSay(svc.title);
-        setTimeout(() => bookingStep2(), 400);
-      });
-      container.appendChild(card);
-    });
-    wrap.appendChild(container);
-  });
-}
-
-// STEP 2 — Date
-function bookingStep2() {
-  const dates = getWeekdays();
-  const options = [...dates, 'None of these work'];
-  botSayAfterTyping("Which day works best for you this week?", (wrap) => {
-    wrap.appendChild(makeQR(options, (picked) => {
-      bookingUserSay(picked);
-      if (picked === 'None of these work') {
-        bookingStep2Custom();
-      } else {
-        bookingState.date = picked;
-        setTimeout(() => bookingStep3(), 400);
-      }
-    }));
-  });
-}
-
-// STEP 2b — Custom date text input
-function bookingStep2Custom() {
-  botSayAfterTyping("What date works for you? (e.g. April 15)", (wrap) => {
-    const inputWrap = document.createElement('div');
-    inputWrap.className = 'booking-input-wrap';
-    inputWrap.innerHTML = `
-      <div class="booking-input-row">
-        <input class="booking-input" type="text" placeholder="e.g. April 15" />
-        <button class="booking-next-btn">Next</button>
-      </div>`;
-    const inp = inputWrap.querySelector('input');
-    const btn = inputWrap.querySelector('button');
-    btn.addEventListener('click', () => {
-      const val = inp.value.trim();
-      if (!val) return;
-      inputWrap.remove();
-      bookingState.date = val;
-      bookingUserSay(val);
-      // Show time slots for custom date
-      botSayAfterTyping(`Here are the available times on ${val}. Which works for you?`, (w) => {
-        w.appendChild(makeQR(TIME_SLOTS, (time) => {
-          bookingState.time = time;
-          bookingUserSay(time);
-          setTimeout(() => bookingStep4(), 400);
-        }));
-      });
-    });
-    inp.addEventListener('keydown', e => { if (e.key === 'Enter') btn.click(); });
-    wrap.appendChild(inputWrap);
-  });
-}
-
-// STEP 3 — Time
-function bookingStep3() {
-  botSayAfterTyping("What time works best? All times are Central Time.", (wrap) => {
-    wrap.appendChild(makeQR(TIME_SLOTS, (time) => {
-      bookingState.time = time;
-      bookingUserSay(time);
-      setTimeout(() => bookingStep4(), 400);
-    }));
-  });
-}
-
-// Inline text input helper for steps 4-7
-function bookingAskText(label, placeholder, validate, onDone) {
-  botSayAfterTyping(label, (wrap) => {
-    const inputWrap = document.createElement('div');
-    inputWrap.className = 'booking-input-wrap';
-    inputWrap.innerHTML = `
-      <div class="booking-input-row">
-        <input class="booking-input" type="text" placeholder="${esc(placeholder)}" />
-        <button class="booking-next-btn">Next</button>
-      </div>
-      <div style="font-size:12px;color:#ef4444;margin-top:4px;display:none" class="booking-err"></div>`;
-    const inp = inputWrap.querySelector('input');
-    const btn = inputWrap.querySelector('button');
-    const err = inputWrap.querySelector('.booking-err');
-    btn.addEventListener('click', () => {
-      const val = inp.value.trim();
-      const errMsg = validate ? validate(val) : (!val ? 'This field is required.' : null);
-      if (errMsg) { err.textContent = errMsg; err.style.display = 'block'; return; }
-      inputWrap.remove();
-      bookingUserSay(val);
-      onDone(val);
-    });
-    inp.addEventListener('keydown', e => { if (e.key === 'Enter') btn.click(); });
-    wrap.appendChild(inputWrap);
-    setTimeout(() => inp.focus(), 100);
-  });
-}
-
-// STEP 4 — Full Name
-function bookingStep4() {
-  bookingAskText("What's your full name?", 'Full name', null, (val) => {
-    bookingState.name = val;
-    setTimeout(() => bookingStep5(), 400);
-  });
-}
-
-// STEP 5 — Email
-function bookingStep5() {
-  bookingAskText("What's your email address?", 'your@email.com', (val) => {
-    if (!val) return 'Email is required.';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) return 'Please enter a valid email address.';
-    return null;
-  }, (val) => {
-    bookingState.email = val;
-    setTimeout(() => bookingStep6(), 400);
-  });
-}
-
-// STEP 6 — Phone
-function bookingStep6() {
-  bookingAskText("What's your phone number?", '(512) 555-0000', null, (val) => {
-    bookingState.phone = val;
-    setTimeout(() => bookingStep7(), 400);
-  });
-}
-
-// STEP 7 — EID
-function bookingStep7() {
-  bookingAskText("What's your UT EID?", 'e.g. ab12345', null, (val) => {
-    bookingState.eid = val;
-    setTimeout(() => bookingStep8(), 400);
-  });
-}
-
-// STEP 8 — Meeting Format
-function bookingStep8() {
-  botSayAfterTyping("How would you prefer to meet?", (wrap) => {
-    wrap.appendChild(makeQR(['In-person', 'Virtually via Teams'], (val) => {
-      bookingState.format = val;
-      bookingUserSay(val);
-      setTimeout(() => bookingStep9(), 400);
-    }));
-  });
-}
-
-// STEP 9 — SNAP Status
-function bookingStep9() {
-  botSayAfterTyping("Where are you in the SNAP process?", (wrap) => {
-    wrap.appendChild(makeQR(["I haven't applied yet","I applied and am waiting","I was denied","I currently receive SNAP","Other"], (val) => {
-      bookingState.snapStatus = val;
-      bookingUserSay(val);
-      setTimeout(() => bookingStep10(), 400);
-    }));
-  });
-}
-
-// STEP 10 — Peer Navigator
-function bookingStep10() {
-  botSayAfterTyping("Are you comfortable with a peer navigator in training sitting in on your session?", (wrap) => {
-    wrap.appendChild(makeQR(["Yes, that's fine", "No, I'd prefer privacy"], (val) => {
-      bookingState.peerNav = val;
-      bookingUserSay(val);
-      setTimeout(() => bookingStep11(), 400);
-    }));
-  });
-}
-
-// STEP 11 — Summary + Complete button
-function bookingStep11() {
-  botSayAfterTyping("Here's a summary of your booking. Review and complete below.", (wrap) => {
-    const s = bookingState;
-    const summary = document.createElement('div');
-    summary.className = 'booking-summary';
-    summary.innerHTML = `<div class="booking-summary-title">Booking Summary</div>` +
-      [
-        ['Service',          s.service],
-        ['Date',             s.date],
-        ['Time',             s.time + ' CT'],
-        ['Full Name',        s.name],
-        ['Email',            s.email],
-        ['Phone',            s.phone],
-        ['UT EID',           s.eid],
-        ['Meeting Format',   s.format],
-        ['SNAP Status',      s.snapStatus],
-        ['Peer Navigator',   s.peerNav],
-      ].map(([label, val]) => `
-        <div class="booking-summary-row">
-          <span class="booking-summary-label">${esc(label)}</span>
-          <span class="booking-summary-val">${esc(val || '')}</span>
-        </div>`).join('');
-    wrap.appendChild(summary);
-
-    const completeBtn = document.createElement('button');
-    completeBtn.className = 'booking-complete-btn';
-    completeBtn.textContent = 'Complete Booking';
-    completeBtn.addEventListener('click', () => {
-      window.open('https://outlook.office.com/book/SNAPBenefitsAdvising@utexas.onmicrosoft.com/', '_blank');
-    });
-    wrap.appendChild(completeBtn);
-
-    const helper = document.createElement('p');
-    helper.className = 'booking-helper-text';
-    helper.textContent = 'Use the info above to complete your booking on UT Outpost\'s page.';
-    wrap.appendChild(helper);
-
-    bookingState = null;
-  });
-}
-
-// ── Init ───────────────────────────────────────────────────────────────────────
+// ── Init ─────────────────────────────────────────────────────────────────────
 function startChat() {
   history = [];
   const greeting = "Hi! I'm your SNAP Benefits Assistant. I'm here to help you understand the application process and figure out if you qualify.\n\nTo make sure I give you the most accurate information, what state are you currently living in?";
