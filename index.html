@@ -119,7 +119,11 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
+      height: auto;
+      min-height: unset;
+      overflow: visible;
     }
+    .message.bot .bubble.streaming-bubble .msg-time { display: none; }
     .bubble-text {
       font-size: 14px;
       font-weight: 500;
@@ -217,6 +221,13 @@
     }
     .typing-dot:nth-child(2) { animation-delay: 0.18s; }
     .typing-dot:nth-child(3) { animation-delay: 0.36s; }
+    .typing-label {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-left: 6px;
+      align-self: center;
+      font-style: italic;
+    }
     @keyframes tdot {
       0%, 60%, 100% { transform: translateY(0);    opacity: 0.35; }
       30%            { transform: translateY(-5px); opacity: 1;    }
@@ -1134,7 +1145,7 @@ UT Outpost Details:
 - Website: https://deanofstudents.utexas.edu/emergency/utoutpost.php
 
 To schedule an appointment, you can:
-OPTIONS:["Book SNAP advising session","Call to book an appointment \u2014 512-471-6242"]
+OPTIONS:["Book SNAP advising session","Call to book an appointment: 512-471-6242"]
 
 - "Maybe not right now" \u2192 Validate warmly. Offer to come back when ready.
 
@@ -1257,7 +1268,7 @@ function attachOptions(wrap, options, phase, advisor = false) {
     // Advisor-specific buttons — rendered as links, not chat messages
     const advisorActions = [
       { text: 'Book SNAP advising session', href: 'https://outlook.office.com/book/SNAPBenefitsAdvising@utexas.onmicrosoft.com/', tel: false },
-      { text: 'Call to book an appointment \u2014 512-471-6242', href: 'tel:512-471-6242', tel: true },
+      { text: 'Call to book an appointment: 512-471-6242', href: 'tel:512-471-6242', tel: true },
     ];
     advisorActions.forEach(action => {
       const a = document.createElement('a');
@@ -1298,7 +1309,10 @@ function attachCitations(raw, wrap, msgRow) {
 
 // ── Citation Parsing ───────────────────────────────────────────────────────────
 function stripMarkdownLinks(text) {
-  return text.replace(/\s*\[([^\]]+)\]\(https?:\/\/[^\)\s]+\)/g, '');
+  return text
+    .replace(/\s*\[([^\]]+)\]\(https?:\/\/[^\)\s]+\)/g, '')
+    .replace(/\u2014/g, ',')       // em dash → comma
+    .replace(/\s+\-\s+/g, ', ');  // " - " punctuation dash → comma
 }
 
 function esc(s) {
@@ -1448,7 +1462,7 @@ function addMessage(role, text, options = []) {
   scrollBottom();
 }
 
-function showTyping() {
+function showTyping(label) {
   const wrap = document.createElement('div');
   wrap.className = 'typing-wrap';
   wrap.id = 'typing';
@@ -1458,6 +1472,7 @@ function showTyping() {
       <div class="typing-dot"></div>
       <div class="typing-dot"></div>
       <div class="typing-dot"></div>
+      ${label ? `<span class="typing-label">${label}</span>` : ''}
     </div>`;
   chatArea.appendChild(wrap);
   scrollBottom();
@@ -1506,7 +1521,7 @@ function createBotBubble() {
   msgRow.className = 'msg-row';
   msgRow.innerHTML = `
     <div class="avatar" aria-hidden="true">SB</div>
-    <div class="bubble">
+    <div class="bubble streaming-bubble">
       <p class="bubble-text streaming" aria-label="Assistant is typing"></p>
       <div class="msg-time" aria-hidden="true">
         <span>${t}</span>
@@ -1519,11 +1534,13 @@ function createBotBubble() {
 
 function updateBubbleText(bubbleText, raw) {
   bubbleText.textContent = stripMarkdownLinks(raw);
+  maybeScroll();
 }
 
 function finalizeMessage(wrap, msgRow, bubbleText, raw) {
   bubbleText.classList.remove('streaming');
   bubbleText.removeAttribute('aria-label');
+  msgRow.querySelector('.bubble')?.classList.remove('streaming-bubble');
 
   const { phase, options, text, amount, listItems, advisor } = parseResponse(raw);
   if (phase) setPhase(phase);
@@ -1667,39 +1684,19 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
   done();
 }
 
-async function callAPI() {
+async function callAPI(retryCount = 0) {
   if (abortCtrl) abortCtrl.abort();
   abortCtrl = new AbortController();
 
   loading = true;
   lockInput(true);
   setStopMode(true);
+  hideTyping();   // clear any existing typing bubble before showing a fresh one
   showTyping();
 
   const { wrap, msgRow, bubbleText } = createBotBubble();
   let raw        = '';
   let firstChunk = true;
-  let revealed   = 0;
-  let streamDone = false;
-  let rafId      = null;
-
-  // Typewriter render loop — reveals characters at a smooth rate
-  function renderTick() {
-    if (revealed < raw.length) {
-      const backlog = raw.length - revealed;
-      const step = Math.max(2, Math.ceil(backlog * 0.15));
-      revealed = Math.min(revealed + step, raw.length);
-      bubbleText.textContent = stripMarkdownLinks(raw.slice(0, revealed));
-      scrollBottom();
-    }
-    if (!streamDone || revealed < raw.length) {
-      rafId = requestAnimationFrame(renderTick);
-    } else {
-      rafId = null;
-      history.push({ role: 'assistant', content: raw });
-      finalizeMessage(wrap, msgRow, bubbleText, raw);
-    }
-  }
 
   try {
     const response = await fetch('/api/chat', {
@@ -1712,12 +1709,16 @@ async function callAPI() {
     if (!response.ok) {
       let msg = `HTTP ${response.status}`;
       try { msg = (await response.json())?.error?.message || msg; } catch {}
-      throw new Error(msg);
+      const retryable = [500, 503, 529].includes(response.status);
+      const err = new Error(msg);
+      err.retryable = retryable;
+      throw err;
     }
 
     const reader  = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let streamDone = false;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -1732,51 +1733,54 @@ async function callAPI() {
         const data = line.slice(6).trim();
         if (data === '[DONE]') continue;
 
-        try {
-          const parsed = JSON.parse(data);
+        let parsed;
+        try { parsed = JSON.parse(data); } catch { continue; }
 
-          if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
-            const token = parsed.delta.text;
-            if (!token) continue;
+        if (parsed.type === 'error') {
+          const sseErr = new Error(parsed.error?.message || 'API error');
+          sseErr.retryable = /overload|529|503/i.test(sseErr.message);
+          throw sseErr;
+        }
 
-            if (firstChunk) {
-              hideTyping();
-              chatArea.appendChild(wrap);
-              scrollBottom();
-              firstChunk = false;
-              rafId = requestAnimationFrame(renderTick);
-            }
+        if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
+          const token = parsed.delta.text;
+          if (!token) continue;
 
-            raw += token;
+          if (firstChunk) {
+            hideTyping();
+            chatArea.appendChild(wrap);
+            firstChunk = false;
           }
 
-          if (parsed.type === 'message_stop') {
-            streamDone = true;
-          }
-        } catch (e) { /* skip malformed chunks */ }
+          raw += token;
+          // Update DOM directly on every token — genuine token-by-token streaming
+          bubbleText.textContent = stripMarkdownLinks(raw);
+          maybeScroll();
+        }
+
+        if (parsed.type === 'message_stop') {
+          streamDone = true;
+        }
       }
     }
 
-    // If stream ended without message_stop
-    if (!streamDone) {
-      streamDone = true;
-      if (firstChunk) {
-        hideTyping();
-        loading = false;
-        setStopMode(false);
-        lockInput(false);
-        abortCtrl = null;
-      }
+    // Stream complete — finalize
+    if (!firstChunk) {
+      history.push({ role: 'assistant', content: raw });
+      finalizeMessage(wrap, msgRow, bubbleText, raw);
+    } else {
+      // No content received
+      hideTyping();
+      loading = false;
+      setStopMode(false);
+      lockInput(false);
+      abortCtrl = null;
     }
 
   } catch (err) {
-    if (rafId) cancelAnimationFrame(rafId);
-
     if (err.name === 'AbortError') {
-      // User hit Stop — flush remaining text and finalize
-      streamDone = true;
+      // User hit Stop — finalize whatever was received
       if (raw) {
-        revealed = raw.length;
         bubbleText.textContent = stripMarkdownLinks(raw);
         history.push({ role: 'assistant', content: raw });
         finalizeMessage(wrap, msgRow, bubbleText, raw);
@@ -1788,14 +1792,26 @@ async function callAPI() {
         abortCtrl = null;
       }
     } else {
+      const isRetryable = err.retryable || /overload|529|503|rate.?limit/i.test(err.message);
+      if (isRetryable && retryCount < 3) {
+        await new Promise(r => setTimeout(r, 2000));
+        hideTyping();
+        showTyping('Retrying...');
+        await new Promise(r => setTimeout(r, 500)); // brief pause so label is visible
+        callAPI(retryCount + 1);
+        return;
+      }
       hideTyping();
+      const finalMsg = isRetryable
+        ? 'The service is temporarily busy. Please wait a moment and try again.'
+        : 'Something went wrong. Please try again.';
       const errWrap = document.createElement('div');
       errWrap.className = 'message bot';
       errWrap.innerHTML = `
         <div class="msg-row">
           <div class="avatar" aria-hidden="true">SB</div>
           <div class="bubble bubble-error" role="alert">
-            <p class="bubble-text">Something went wrong: ${err.message}</p>
+            <p class="bubble-text">${finalMsg}</p>
             <button class="retry-btn">Try again</button>
           </div>
         </div>`;
@@ -2121,11 +2137,51 @@ function renderActionCards(wrap) {
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────
+function addGreetingBubble(text) {
+  const t = nowTime();
+  const wrap = document.createElement('div');
+  wrap.className = 'message bot';
+  const msgRow = document.createElement('div');
+  msgRow.className = 'msg-row';
+  msgRow.innerHTML = `
+    <div class="avatar">SB</div>
+    <div class="bubble">
+      <div class="bubble-text"></div>
+      <div class="msg-time"><span>${t}</span>${checkSVG('#94a3b8')}</div>
+    </div>`;
+  // Split on double newlines into paragraphs, no question-splitting logic
+  const bubbleText = msgRow.querySelector('.bubble-text');
+  const paras = text.split('\n\n');
+  paras.forEach((p, i) => {
+    const el = document.createElement('p');
+    el.textContent = p;
+    if (i > 0) el.style.marginTop = '0.5em';
+    bubbleText.appendChild(el);
+  });
+  wrap.appendChild(msgRow);
+  chatArea.appendChild(wrap);
+  scrollBottom();
+}
+
 function startChat() {
   history = [];
-  const greeting = "Hi! I'm your SNAP Benefits Assistant. I'm here to help you understand the application process and figure out if you qualify.\n\nTo make sure I give you the most accurate information, what state are you currently living in?";
-  addMessage('bot', greeting);
-  history.push({ role: 'assistant', content: greeting });
+
+  const bubble1 = "Hi! I'm your SNAP Benefits Assistant, here to help you figure out if you qualify. Feel free to ask about anything you're unsure of.";
+  const bubble2 = "To make sure I give you the most accurate information, what state are you currently living in?";
+
+  addGreetingBubble(bubble1);
+  history.push({ role: 'assistant', content: bubble1 });
+
+  lockInput(true);
+  setTimeout(() => {
+    showTyping();
+    setTimeout(() => {
+      hideTyping();
+      addGreetingBubble(bubble2);
+      history.push({ role: 'assistant', content: bubble2 });
+      lockInput(false);
+    }, 600);
+  }, 800);
 }
 
 msgInput.disabled = false;

@@ -47,6 +47,8 @@ export default async function handler(req) {
       ...CORS,
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Transfer-Encoding': 'chunked',
       'X-Accel-Buffering': 'no',
     },
   });
