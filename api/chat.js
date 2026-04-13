@@ -7,8 +7,6 @@ const CORS = {
 };
 
 export default async function handler(req) {
-  console.log('[chat] request received:', req.method);
-
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS });
   }
@@ -17,20 +15,25 @@ export default async function handler(req) {
     return new Response('Method not allowed', { status: 405, headers: CORS });
   }
 
-  console.log('[chat] API key exists:', !!process.env.ANTHROPIC_API_KEY);
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return new Response(JSON.stringify({ error: { message: 'API key not configured' } }), {
+      status: 500,
+      headers: { ...CORS, 'Content-Type': 'application/json' },
+    });
+  }
 
   const { messages, system } = await req.json();
-  console.log('[chat] sending to Anthropic, messages count:', messages?.length);
 
   const upstream = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
+      'x-api-key': apiKey,
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-5-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1000,
       stream: true,
       system,
@@ -38,11 +41,8 @@ export default async function handler(req) {
     }),
   });
 
-  console.log('[chat] Anthropic status:', upstream.status);
-
   if (!upstream.ok) {
     const err = await upstream.text();
-    console.log('[chat] Anthropic error:', err);
     return new Response(err, {
       status: upstream.status,
       headers: { ...CORS, 'Content-Type': 'application/json' },
