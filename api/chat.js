@@ -7,6 +7,8 @@ const CORS = {
 };
 
 export default async function handler(req) {
+  console.log('[chat] request received:', req.method);
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS });
   }
@@ -15,7 +17,10 @@ export default async function handler(req) {
     return new Response('Method not allowed', { status: 405, headers: CORS });
   }
 
+  console.log('[chat] API key exists:', !!process.env.ANTHROPIC_API_KEY);
+
   const { messages, system } = await req.json();
+  console.log('[chat] sending to Anthropic, messages count:', messages?.length);
 
   const upstream = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -25,7 +30,7 @@ export default async function handler(req) {
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-5-20241022',
       max_tokens: 1000,
       stream: true,
       system,
@@ -33,8 +38,11 @@ export default async function handler(req) {
     }),
   });
 
+  console.log('[chat] Anthropic status:', upstream.status);
+
   if (!upstream.ok) {
     const err = await upstream.text();
+    console.log('[chat] Anthropic error:', err);
     return new Response(err, {
       status: upstream.status,
       headers: { ...CORS, 'Content-Type': 'application/json' },
