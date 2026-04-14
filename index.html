@@ -1163,7 +1163,7 @@ FY2026 limits: 1=$1,696 | 2=$2,292 | 3=$2,888 | 4=$3,483 | 5+=$4,079
 IMPORTANT: Use HIGHLIGHT:$[number] exactly as shown — the frontend renders it in teal color. Never use **markdown bold** for the amount.
 OPTIONS:["Below that limit","Around that limit","Clearly above that limit"]
 
-- Clearly above \u2192 Explain over income limit. Suggest UT Outpost, Central Texas Food Bank, campus emergency aid. End warmly. STOP.
+- Clearly above \u2192 Use INELIGIBLE_SPLIT format (see below). Bubble 1: Explain they are over the income limit for their household size. Be empathetic. Include a markdown citation link so the Sources chip appears. Bubble 2 is hardcoded by frontend. STOP.
 
 - Below or around AND path = STUDENT_EXEMPT:
   \u2192 "You're very likely eligible for SNAP!" Give estimated max benefit.
@@ -1412,15 +1412,30 @@ function attachOptions(wrap, options, phase, advisor = false) {
       qrWrap.appendChild(a);
     });
   } else {
+    // Map certain option labels to external links instead of chat messages
+    const LINK_OPTIONS = {
+      'Start applying on TexasBenefits.com': 'https://yourtexasbenefits.com',
+    };
+
     options.forEach(opt => {
-      const btn = document.createElement('button');
-      btn.className = 'qr-btn';
-      btn.textContent = opt;
-      btn.addEventListener('click', () => {
-        qrWrap.querySelectorAll('.qr-btn').forEach(b => b.disabled = true);
-        handleUserMessage(opt);
-      });
-      qrWrap.appendChild(btn);
+      if (LINK_OPTIONS[opt]) {
+        const a = document.createElement('a');
+        a.className = 'qr-btn';
+        a.textContent = opt;
+        a.href = LINK_OPTIONS[opt];
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        qrWrap.appendChild(a);
+      } else {
+        const btn = document.createElement('button');
+        btn.className = 'qr-btn';
+        btn.textContent = opt;
+        btn.addEventListener('click', () => {
+          qrWrap.querySelectorAll('.qr-btn').forEach(b => b.disabled = true);
+          handleUserMessage(opt);
+        });
+        qrWrap.appendChild(btn);
+      }
     });
   }
   wrap.appendChild(qrWrap);
