@@ -1087,7 +1087,7 @@ Ask: "Got it. Just to clarify \u2014 how many meals a week does your plan actual
 OPTIONS:["More than 10 meals a week (most meals covered)","10 meals or fewer a week (only some meals)","I\u2019m not sure how to count mine"]
 - More than 10 meals \u2192 Use INELIGIBLE_SPLIT format. Bubble 1: Explain the student meal plan rule \u2014 covering more than 50% of weekly meals (>10 of 21) makes a student ineligible for SNAP. Be empathetic. Bubble 2 is hardcoded by frontend. STOP.
 - 10 or fewer meals \u2192 "Good news \u2014 your meal plan only covers part of the week, so it doesn\u2019t block your eligibility. Let\u2019s keep going." \u2192 go to Step 4
-- Not sure \u2192 Explain: "Count each scheduled meal your plan provides per week \u2014 breakfast, lunch, and dinner each count as 1. If your plan covers 5 weekday lunches, that\u2019s 5 meals. If it covers breakfast and lunch on weekdays, that\u2019s 10 meals." Then re-ask with OPTIONS:["My plan covers more than 10 meals a week","My plan covers 10 meals or fewer a week"]
+- Not sure \u2192 Explain: "Count each scheduled meal your plan provides per week \u2014 breakfast, lunch, and dinner each count as 1. If your plan covers 5 weekday lunches, that\u2019s 5 meals. If it covers breakfast and lunch on weekdays, that\u2019s 10 meals." Then re-ask with OPTIONS:["More than 10 meals a week (most meals covered)","10 meals or fewer a week (only some meals)"]
 
 Step 4 \u2014 Exemption check:
 OPTIONS:["I work 20+ hours per week","My school offers work-study","I have a dependent child","I have a documented disability","I receive TANF","None of these apply"]
