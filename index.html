@@ -441,6 +441,28 @@
     /* ── Eligibility amount display ───────────────────── */
     .advisor-link { color: #1e827d; text-decoration: none; }
     .advisor-link:hover { text-decoration: underline; }
+    .apply-checklist {
+      margin: 0.5em 0 0 1.2em;
+      font-size: 14px;
+      color: #1e293b;
+      line-height: 1.6;
+    }
+    .apply-cta-btn {
+      display: block;
+      margin-top: 12px;
+      background: #1e827d;
+      color: white;
+      text-decoration: none;
+      text-align: center;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      width: 100%;
+      box-sizing: border-box;
+      transition: background 0.15s;
+    }
+    .apply-cta-btn:hover { background: #196b67; }
     .benefit-amount {
       display: flex;
       align-items: baseline;
@@ -1468,30 +1490,17 @@ function attachOptions(wrap, options, phase, advisor = false) {
       qrWrap.appendChild(a);
     });
   } else {
-    // Map certain option labels to external links instead of chat messages
-    const LINK_OPTIONS = {
-      'Start applying on TexasBenefits.com': 'https://yourtexasbenefits.com',
-    };
-
+    // All options render as chat-sending buttons.
+    // 'Start applying on TexasBenefits.com' is intercepted in handleUserMessage.
     options.forEach(opt => {
-      if (LINK_OPTIONS[opt]) {
-        const a = document.createElement('a');
-        a.className = 'qr-btn';
-        a.textContent = opt;
-        a.href = LINK_OPTIONS[opt];
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        qrWrap.appendChild(a);
-      } else {
-        const btn = document.createElement('button');
-        btn.className = 'qr-btn';
-        btn.textContent = opt;
-        btn.addEventListener('click', () => {
-          qrWrap.querySelectorAll('.qr-btn').forEach(b => b.disabled = true);
-          handleUserMessage(opt);
-        });
-        qrWrap.appendChild(btn);
-      }
+      const btn = document.createElement('button');
+      btn.className = 'qr-btn';
+      btn.textContent = opt;
+      btn.addEventListener('click', () => {
+        qrWrap.querySelectorAll('.qr-btn').forEach(b => b.disabled = true);
+        handleUserMessage(opt);
+      });
+      qrWrap.appendChild(btn);
     });
   }
   wrap.appendChild(qrWrap);
@@ -2416,6 +2425,54 @@ async function handleUserMessage(text) {
   if (text === "I'll apply later") {
     history.push({ role: 'user', content: text });
     renderSummaryBubble();
+    return;
+  }
+
+  // Intercept "Start applying on TexasBenefits.com" — show pre-apply bubble, skip API
+  if (text === 'Start applying on TexasBenefits.com') {
+    history.push({ role: 'user', content: text });
+    showTyping();
+    setTimeout(() => {
+      hideTyping();
+      const { wrap: wP, msgRow: mrP, bubbleText: btP } = createBotBubble();
+      btP.innerHTML = '';
+
+      const p1 = document.createElement('p');
+      p1.textContent = 'YourTexasBenefits.com will open in a new tab.';
+      btP.appendChild(p1);
+
+      const p2 = document.createElement('p');
+      p2.style.marginTop = '0.75em';
+      p2.textContent = 'Before you go, a few things to keep in mind:';
+      btP.appendChild(p2);
+
+      const ol = document.createElement('ol');
+      ol.className = 'apply-checklist';
+      [
+        'The application takes about 30\u201360 minutes to complete',
+        "You\u2019ll be asked about your income, household, and expenses",
+        'Make sure you have your documents ready before you start',
+      ].forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = item;
+        ol.appendChild(li);
+      });
+      btP.appendChild(ol);
+
+      const ctaBtn = document.createElement('a');
+      ctaBtn.className = 'apply-cta-btn';
+      ctaBtn.textContent = 'Go to YourTexasBenefits.com';
+      ctaBtn.href = 'https://yourtexasbenefits.com';
+      ctaBtn.target = '_blank';
+      ctaBtn.rel = 'noopener noreferrer';
+      btP.appendChild(ctaBtn);
+
+      btP.classList.remove('streaming');
+      btP.removeAttribute('aria-label');
+      mrP.querySelector('.bubble')?.classList.remove('streaming-bubble');
+      chatArea.appendChild(wP);
+      scrollBottom();
+    }, 800);
     return;
   }
 
