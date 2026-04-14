@@ -57,7 +57,58 @@ export default async function handler(req) {
     });
   }
 
-  return new Response(upstream.body, {
+  // ── Thinking-block filter ─────────────────────────────────────────────────
+  // Strip content blocks of type "thinking" from the SSE stream before it
+  // reaches the client, so internal model reasoning never appears in the UI.
+  const thinkingIndices = new Set();
+  const enc = new TextEncoder();
+  const dec = new TextDecoder();
+  let sseBuffer = '';
+
+  const filterStream = new TransformStream({
+    transform(chunk, controller) {
+      sseBuffer += dec.decode(chunk, { stream: true });
+      // SSE events are delimited by double newlines
+      const events = sseBuffer.split('\n\n');
+      sseBuffer = events.pop(); // last element may be an incomplete event
+
+      for (const event of events) {
+        let skip = false;
+        const dataLine = event.split('\n').find(l => l.startsWith('data: '));
+        if (dataLine) {
+          try {
+            const d = JSON.parse(dataLine.slice(6));
+            // Mark and skip thinking content_block_start events
+            if (d.type === 'content_block_start' && d.content_block?.type === 'thinking') {
+              thinkingIndices.add(d.index);
+              skip = true;
+            }
+            // Skip thinking_delta or any delta on a known thinking index
+            if (d.type === 'content_block_delta' &&
+                (d.delta?.type === 'thinking_delta' || thinkingIndices.has(d.index))) {
+              skip = true;
+            }
+            // Skip content_block_stop for thinking blocks, then clear the index
+            if (d.type === 'content_block_stop' && thinkingIndices.has(d.index)) {
+              thinkingIndices.delete(d.index);
+              skip = true;
+            }
+          } catch { /* non-JSON line (e.g. event: ping) — pass through */ }
+        }
+        if (!skip) {
+          controller.enqueue(enc.encode(event + '\n\n'));
+        }
+      }
+    },
+    flush(controller) {
+      // Flush any remaining buffered data
+      if (sseBuffer.trim()) {
+        controller.enqueue(enc.encode(sseBuffer));
+      }
+    },
+  });
+
+  return new Response(upstream.body.pipeThrough(filterStream), {
     status: 200,
     headers: {
       ...CORS,

@@ -2154,6 +2154,9 @@ async function callAPI(retryCount = 0) {
             throw sseErr;
           }
 
+          // Safety: explicitly skip thinking deltas even if they slip past the server filter
+          if (parsed.delta?.type === 'thinking_delta') continue;
+
           if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
             const token = parsed.delta.text;
             if (!token) continue;
@@ -2165,6 +2168,8 @@ async function callAPI(retryCount = 0) {
             }
 
             raw += token;
+            // Safety guard: discard if thinking content leaked through as raw text
+            if (/^\s*<thinking>/i.test(raw)) { raw = ''; continue; }
             // Strip all internal tags before updating the DOM so they never
             // appear as raw text in the bubble during streaming.
             bubbleText.textContent = stripMarkdownLinks(stripStreamingTags(raw));
@@ -2810,7 +2815,7 @@ function startChat() {
   history = [];
   resetSnapData();
 
-  const bubble1 = "Hi! I'm your SNAP Benefits Assistant, here to help you figure out if you qualify. Feel free to ask about anything you're unsure of.";
+  const bubble1 = "Hi! I'm your SNAP Eligibility Assistant, here to help you figure out if you qualify. Feel free to ask about anything you're unsure of.";
   const bubble2 = "To make sure I give you the most accurate information, what state are you currently living in?";
 
   addGreetingBubble(bubble1);
