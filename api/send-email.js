@@ -116,8 +116,8 @@ export default async function handler(req) {
     },
     body: JSON.stringify({
       from: 'SNAP Benefits Assistant <onboarding@resend.dev>',
-      to: [email],
-      subject: 'Your SNAP Eligibility Summary',
+      to: ['huangxhn@gmail.com'],
+      subject: `SNAP Summary — submitted by ${email}`,
       html: buildHtml(summary),
     }),
   });

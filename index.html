@@ -2689,10 +2689,10 @@ async function renderEmailConfirmation(email) {
     bubbleText.innerHTML = '';
     if (res.ok) {
       const p1 = document.createElement('p');
-      p1.textContent = `Done! Your summary is on its way to ${email}.`;
+      p1.textContent = 'Got it! We\'ve saved your summary for reference.';
       const p2 = document.createElement('p');
       p2.style.marginTop = '0.5em';
-      p2.textContent = 'You can apply anytime at YourTexasBenefits.com — your situation hasn\'t changed.';
+      p2.textContent = 'You can apply anytime at YourTexasBenefits.com.';
       bubbleText.appendChild(p1);
       bubbleText.appendChild(p2);
     } else {
