@@ -1087,15 +1087,49 @@ OPTIONS:["I work 20+ hours per week","My school offers work-study","I have a dep
 - None \u2192 Explain meal plan blocks eligibility. Suggest UT Outpost, Central Texas Food Bank, Student Emergency Services. End warmly. STOP.
 - Any other \u2192 "That exemption qualifies you to move forward." \u2192 Set path = STUDENT_EXEMPT \u2192 go to PHASE 2
 
-PHASE 2 \u2014 INCOME SNAPSHOT:
+INCOME TYPES REFERENCE (Source: Texas Works Handbook A-1320 — https://www.hhs.texas.gov/handbooks/texas-works-handbook/a-1320-types-income)
+Use this to answer any questions about what counts as income for SNAP.
+
+EARNED INCOME (counts toward the limit):
+- Wages and salaries from a job (before taxes)
+- Self-employment income (profit after business expenses)
+- Farm income, tips, commissions
+- Military base pay, seasonal employment income
+
+UNEARNED INCOME (also counts):
+- Social Security or disability benefits (RSDI, SSI)
+- Unemployment benefits
+- Child support received
+- Veterans Affairs (VA) benefits
+- TANF cash assistance, military allotments
+- Pension or retirement payments
+
+NOT COUNTED (exempt from income):
+- Federal tax refunds and Earned Income Tax Credit (EIC) payments
+- Flexible fringe benefits (health insurance, childcare benefits)
+- Financial aid used for education expenses
+- Loans that must be repaid
+- One-time lump sum payments (in most cases)
+
+GROSS INCOME = all earned + unearned income before any deductions
+NET INCOME = gross income minus allowable deductions (rent, utilities, childcare, medical expenses for elderly/disabled)
+
+When a user asks "what counts as income?" or "does X count as income?", answer accurately using this reference and cite: [Texas Works Handbook A-1320](https://www.hhs.texas.gov/handbooks/texas-works-handbook/a-1320-types-income)
+
+PHASE 2 — INCOME SNAPSHOT:
 Tag this message with PHASE:2
 
 Step 5 \u2014 Household size:
 OPTIONS:["Just me (1 person)","2 people","3 people","4 people","5 or more people"]
 
-Step 6 \u2014 Income check:
-Share their gross monthly income limit clearly, then ask:
+Step 6 — Income check:
+Share the income limit using this EXACT sentence format:
+"For a [X]-person household, the gross monthly income limit is HIGHLIGHT:$[number]. This includes the total income everyone in your household makes before taxes, from all sources like wages, benefits, or financial support.
+
+How does your household's monthly income compare to that?"
+
 FY2026 limits: 1=$1,696 | 2=$2,292 | 3=$2,888 | 4=$3,483 | 5+=$4,079
+IMPORTANT: Use HIGHLIGHT:$[number] exactly as shown — the frontend renders it in teal color. Never use **markdown bold** for the amount.
 OPTIONS:["Below that limit","Around that limit","Clearly above that limit"]
 
 - Clearly above \u2192 Explain over income limit. Suggest UT Outpost, Central Texas Food Bank, campus emergency aid. End warmly. STOP.
@@ -1110,32 +1144,56 @@ OPTIONS:["Below that limit","Around that limit","Clearly above that limit"]
 Step 7 \u2014 Work Rules check (NON_STUDENT path only):
 "One more thing, SNAP has a work requirement for some adults. Do any of these apply to you?"
 OPTIONS:["I work or volunteer 80+ hours/month","I have a child under 18","I'm in a job training program","I'm 55 or older","I'm a student enrolled at least half-time","None of these apply"]
-- None \u2192 Explain work requirement makes them ineligible for now. Suggest campus resources and food bank. End warmly. STOP.
+- None \u2192 Output INELIGIBLE result (see format below). STOP.
 - Any other \u2192 go to PHASE 3 (eligible result)
 
 PHASE 3 \u2014 NEXT STEPS:
 Tag this message with PHASE:3
 
-When user is ELIGIBLE, output in this EXACT format — do not add any extra sentences, questions, or filler phrases like "What would you like to do next?":
+━━━ ELIGIBLE RESULT FORMAT ━━━
+When user IS eligible, output this EXACT structure — no additions, no rephrasing:
 
-[1-2 sentence eligibility confirmation only — no question at the end]
+Based on what you've shared, you're likely eligible for SNAP.
 
-AMOUNT:$XXX
+AMOUNT:$[number from table below]
 
-As a [N]-person household, you could receive up to $XXX per month in SNAP benefits. Your actual amount depends on your income and expenses. To complete your application, you'll need a few documents:
+Your actual benefit depends on your income and expenses. To apply, you'll need:
 LIST:
-1. Proof of income (like a recent pay stub)
+1. Proof of income (pay stub or financial aid letter)
 2. Your Social Security Number
-3. Bank statements (if you have savings accounts)
+3. Bank statements (if applicable)
 END_LIST
-OPTIONS:["Let's start my application on TexasBenefits.com","I have more questions to ask UT Outpost advisor","Maybe not right now"]
-
-IMPORTANT: Copy the OPTIONS text above exactly — do not rephrase or paraphrase the button labels.
+OPTIONS:["Start applying on TexasBenefits.com","I have more questions to ask UT Outpost advisor","I'll apply later"]
 
 Monthly benefit amounts: 1=$298 | 2=$546 | 3=$785 | 4=$994 | 5=$1,183
 
-- "Let's start my application" \u2192 Direct to YourTexasBenefits.com. Note it takes ~30 minutes.
-- "I have more questions to ask UT Outpost advisor" \u2192 Output this EXACT format, no deviations:
+RULES — do not break these:
+- Paragraph 1: use the exact text "Based on what you've shared, you're likely eligible for SNAP." — no additions
+- Paragraph 2: exactly 1 sentence before the list — copy it word for word
+- Do NOT repeat the dollar amount or household size in paragraph 2
+- Do NOT add "What would you like to do next?" anywhere
+- Copy the OPTIONS text above exactly — do not rephrase the button labels
+
+━━━ INELIGIBLE RESULT FORMAT ━━━
+When user is NOT eligible, output TWO messages separated by the token INELIGIBLE_SPLIT on its own line:
+
+MESSAGE 1 — Reason (2-3 sentences max, warm and clear):
+Explain why they don't qualify right now using plain language.
+Reference the specific rule that applies.
+End message 1 with a markdown citation link so the Sources chip appears.
+Example for work rules:
+"Based on what you've shared, you may not qualify for ongoing SNAP benefits right now.
+
+Adults 18–54 without dependents generally need to work or participate in job training for at least 80 hours/month to continue receiving benefits beyond 3 months. [USDA FNS](https://www.fns.usda.gov/snap/work-requirements)"
+
+INELIGIBLE_SPLIT
+
+(The frontend renders the resource list automatically after INELIGIBLE_SPLIT — do NOT output anything after the token.)
+
+Do NOT output OPTIONS after INELIGIBLE_SPLIT. Stop after the token.
+
+━━━ ADVISOR RESPONSE ━━━
+When user selects "I have more questions to ask UT Outpost advisor" \u2192 Output this EXACT format, no deviations:
 
 ADVISOR:1
 Got it. UT Outpost advisors can walk you through the full application in person.
@@ -1147,7 +1205,7 @@ UT Outpost Details:
 To schedule an appointment, you can:
 OPTIONS:["Book SNAP advising session","Call to book an appointment: 512-471-6242"]
 
-- "Maybe not right now" \u2192 Validate warmly. Offer to come back when ready.
+- "I'll apply later" \u2192 The frontend handles this directly with a summary card. Do NOT generate a response for this option.
 
 Always end with warmth. Remind them SNAP exists to help, there is no shame in applying.`;
 
@@ -1192,6 +1250,9 @@ function parseResponse(raw) {
   // Strip any stray phase labels the model may include in the visible text
   text = text.replace(/^PHASE:\d\s*\n?/gim, '').trim();
   text = text.replace(/\bPhase\s+\d\b\s*[—\-–]?\s*/gi, '').trim();
+
+  // Strip "What would you like to do next?" — conveyed by the buttons, not text
+  text = text.replace(/\n?What would you like to do next\??/gi, '').trim();
 
   // OPTIONS tag — strip citation links from a scratch copy first so a trailing
   // [Text](url) citation on the same or next line doesn't break the match.
@@ -1310,9 +1371,41 @@ function attachCitations(raw, wrap, msgRow) {
 // ── Citation Parsing ───────────────────────────────────────────────────────────
 function stripMarkdownLinks(text) {
   return text
+    .replace(/\s*\[([^\]]+)\]\(https?:\/\/[^\)\s]+\)/g, '')  // [text](url)
+    .replace(/\*\*([^*]+)\*\*/g, '$1')                        // **bold**
+    .replace(/\*([^*]+)\*/g, '$1')                            // *italic*
+    .replace(/HIGHLIGHT:(\$[\d,]+)/g, '$1')                   // HIGHLIGHT tag → plain amount
+    .replace(/\u2014/g, ',')                                  // em dash → comma
+    .replace(/\s+\-\s+/g, ', ');                              // " - " dash → comma
+}
+
+// Render a text string with HIGHLIGHT:$XXX as an inline teal bold span
+function renderHighlightText(container, rawText) {
+  const hasHighlight = /HIGHLIGHT:\$[\d,]+/.test(rawText);
+  if (!hasHighlight) {
+    container.textContent = stripMarkdownLinks(rawText);
+    return;
+  }
+  // Pre-clean everything except HIGHLIGHT tags, then split
+  const cleaned = rawText
     .replace(/\s*\[([^\]]+)\]\(https?:\/\/[^\)\s]+\)/g, '')
-    .replace(/\u2014/g, ',')       // em dash → comma
-    .replace(/\s+\-\s+/g, ', ');  // " - " punctuation dash → comma
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/\u2014/g, ',')
+    .replace(/\s+\-\s+/g, ', ');
+  const parts = cleaned.split(/(HIGHLIGHT:\$[\d,]+)/);
+  parts.forEach(part => {
+    const m = part.match(/^HIGHLIGHT:(\$[\d,]+)$/);
+    if (m) {
+      const span = document.createElement('span');
+      span.textContent = m[1];
+      span.style.color = '#1e827d';
+      span.style.fontWeight = '600';
+      container.appendChild(span);
+    } else if (part) {
+      container.appendChild(document.createTextNode(part));
+    }
+  });
 }
 
 function esc(s) {
@@ -1643,13 +1736,7 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
       bubbleText.appendChild(ol);
     }
 
-    // "What would you like to do next?" prompt
-    const nextP = document.createElement('p');
-    nextP.textContent = 'What would you like to do next?';
-    nextP.style.marginTop = '8px';
-    bubbleText.appendChild(nextP);
-
-    // Hardcoded sources chip + time inside bubble
+    // Sources chip + time inside bubble
     const eligibleSources = [
       { url: 'https://www.fns.usda.gov/snap/allotment/cola', title: 'USDA FNS Benefits', domain: 'fns.usda.gov', context: 'SNAP benefit allotment amounts by household size.' },
       { url: 'https://www.fns.usda.gov/snap/recipient/eligibility', title: 'USDA FNS Eligibility', domain: 'fns.usda.gov', context: 'SNAP eligibility requirements and income limits.' },
@@ -1661,25 +1748,95 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
     stack.appendChild(buildSourcesChip(eligibleSources));
     stack.appendChild(timeEl);
     bubble.appendChild(stack);
+  } else if (text.includes('INELIGIBLE_SPLIT')) {
+    // ── Ineligible two-bubble result ─────────────────────────────────────────
+    const splitIdx = text.indexOf('INELIGIBLE_SPLIT');
+    const msg1 = text.slice(0, splitIdx).trim();
+
+    // Bubble 1 — reason text (with citations from AI)
+    bubbleText.innerHTML = '';
+    const parts1 = msg1.split(/\n\n+/);
+    parts1.forEach((part, i) => {
+      const p = document.createElement('p');
+      p.textContent = stripMarkdownLinks(part.trim());
+      if (i > 0) p.style.marginTop = '0.5em';
+      bubbleText.appendChild(p);
+    });
+    attachCitations(msg1, wrap, msgRow);
+    scrollBottom();
+
+    // Bubble 2 — hardcoded resources matching Figma design
+    const RESOURCES = [
+      { label: 'UT Outpost \u2013 Emergency food assistance',        url: 'https://deanofstudents.utexas.edu/emergency/utoutpost.php' },
+      { label: 'Central Texas Food Bank \u2013 Free food distributions', url: 'https://www.centraltexasfoodbank.org' },
+      { label: 'Student Emergency Services \u2013 Financial support', url: 'https://deanofstudents.utexas.edu/emergency' },
+    ];
+
+    setTimeout(() => {
+      showTyping();
+      setTimeout(() => {
+        hideTyping();
+        const { wrap: wrap2, msgRow: msgRow2, bubbleText: bt2 } = createBotBubble();
+        bt2.innerHTML = '';
+
+        const intro = document.createElement('p');
+        intro.textContent = 'However, there are other resources available to support you:';
+        bt2.appendChild(intro);
+
+        RESOURCES.forEach(({ label, url }) => {
+          const labelP = document.createElement('p');
+          labelP.style.marginTop = '10px';
+          labelP.textContent = '\u2022 ' + label;
+          bt2.appendChild(labelP);
+
+          const linkP = document.createElement('p');
+          linkP.style.marginTop = '2px';
+          const a = document.createElement('a');
+          a.href = url;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          a.className = 'advisor-link';
+          a.textContent = url;
+          linkP.appendChild(a);
+          bt2.appendChild(linkP);
+        });
+
+        bt2.classList.remove('streaming');
+        bt2.removeAttribute('aria-label');
+        msgRow2.querySelector('.bubble')?.classList.remove('streaming-bubble');
+        chatArea.appendChild(wrap2);
+        scrollBottom();
+        done();
+      }, 600);
+    }, 800);
+    return; // done() called inside the timeout above
+
   } else {
-    // ── Plain text bubble (normal or ineligible) ────────────────────────────
+    // ── Plain text bubble (normal response) ──────────────────────────────────
+    const hasHighlight = /HIGHLIGHT:\$[\d,]+/.test(text);
     const split = splitAtQuestion(text);
     if (split) {
       bubbleText.innerHTML = '';
       const p1 = document.createElement('p');
-      p1.textContent = stripMarkdownLinks(split.part1);
+      renderHighlightText(p1, split.part1);
       const p2 = document.createElement('p');
       p2.style.marginTop = '0.5em';
-      p2.textContent = stripMarkdownLinks(split.part2);
+      renderHighlightText(p2, split.part2);
       bubbleText.appendChild(p1);
       bubbleText.appendChild(p2);
+    } else if (hasHighlight) {
+      bubbleText.innerHTML = '';
+      const p = document.createElement('p');
+      renderHighlightText(p, text);
+      bubbleText.appendChild(p);
     } else {
       bubbleText.textContent = stripMarkdownLinks(text);
     }
   }
 
   attachOptions(wrap, options, phase);
-  attachCitations(raw, wrap, msgRow);
+  // Skip attachCitations for amount bubble — it already has a hardcoded sources chip
+  if (!amount) attachCitations(raw, wrap, msgRow);
   scrollBottom();
   done();
 }
@@ -1754,7 +1911,8 @@ async function callAPI(retryCount = 0) {
 
           raw += token;
           // Update DOM directly on every token — genuine token-by-token streaming
-          bubbleText.textContent = stripMarkdownLinks(raw);
+          // Hide the split token during streaming so it doesn't flash in the bubble
+          bubbleText.textContent = stripMarkdownLinks(raw.replace(/\nINELIGIBLE_SPLIT\n?[\s\S]*/g, ''));
           maybeScroll();
         }
 

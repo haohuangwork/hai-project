@@ -3,7 +3,8 @@
     "allow": [
       "mcp__Claude_Preview__preview_start",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/)",
-      "mcp__Figma__get_screenshot"
+      "mcp__Figma__get_screenshot",
+      "Bash(python3)"
     ]
   }
 }
