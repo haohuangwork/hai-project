@@ -47,12 +47,9 @@
       width: 40px;
       height: 40px;
       border-radius: 8px;
-      background: #024d36;
       flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
+      display: block;
+      object-fit: cover;
     }
     .header-text { flex: 1; }
     .header-title {
@@ -969,15 +966,7 @@
 
   <!-- Header -->
   <header class="header">
-    <div class="header-icon" aria-hidden="true">
-      <svg width="34" height="34" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="34" height="34" fill="#024d36"/>
-        <path d="M8 10h18l-2 12H10L8 10z" fill="#5DCAA5" opacity="0.9"/>
-        <path d="M12 10c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke="#9FE1CB" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-        <rect x="7" y="18" width="20" height="3" rx="1.5" fill="#024d36"/>
-        <text x="17" y="28" text-anchor="middle" font-family="sans-serif" font-size="6" font-weight="700" fill="white" letter-spacing="0.5">SNAP</text>
-      </svg>
-    </div>
+    <img class="header-icon" src="avatar.svg" alt="SNAP Eligibility Assistant" aria-hidden="true">
     <div class="header-text">
       <div class="header-title">SNAP Eligibility Assistant</div>
       <div class="header-sub">Quickly check if you may qualify for SNAP benefits.</div>
