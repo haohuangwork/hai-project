@@ -23,7 +23,15 @@ export default async function handler(req) {
     });
   }
 
-  const { messages, system } = await req.json();
+  let messages, system;
+  try {
+    ({ messages, system } = await req.json());
+  } catch {
+    return new Response(JSON.stringify({ error: { message: 'Invalid request body' } }), {
+      status: 400,
+      headers: { ...CORS, 'Content-Type': 'application/json' },
+    });
+  }
 
   const upstream = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',

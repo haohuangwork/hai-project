@@ -1080,12 +1080,43 @@ OPTIONS:["Degree program (BA, BS, MS, PhD, etc.)","Vocational or trade school","
 Step 3 \u2014 Meal plan:
 OPTIONS:["Yes, I have a school meal plan","No meal plan"]
 - No meal plan \u2192 Set path = STUDENT_EXEMPT \u2192 go to PHASE 2
-- Yes meal plan \u2192 go to Step 4
+- Yes meal plan \u2192 go to Step 3b
+
+Step 3b \u2014 Meal plan level check:
+Ask: "Got it. Just to clarify \u2014 how many meals a week does your plan actually cover? A full week has 21 meals (3 meals \u00d7 7 days). If your plan covers more than half of those, it affects your SNAP eligibility."
+OPTIONS:["More than 10 meals a week (most meals covered)","10 meals or fewer a week (only some meals)","I\u2019m not sure how to count mine"]
+- More than 10 meals \u2192 Use INELIGIBLE_SPLIT format. Bubble 1: Explain the student meal plan rule \u2014 covering more than 50% of weekly meals (>10 of 21) makes a student ineligible for SNAP. Be empathetic. Bubble 2 is hardcoded by frontend. STOP.
+- 10 or fewer meals \u2192 "Good news \u2014 your meal plan only covers part of the week, so it doesn\u2019t block your eligibility. Let\u2019s keep going." \u2192 go to Step 4
+- Not sure \u2192 Explain: "Count each scheduled meal your plan provides per week \u2014 breakfast, lunch, and dinner each count as 1. If your plan covers 5 weekday lunches, that\u2019s 5 meals. If it covers breakfast and lunch on weekdays, that\u2019s 10 meals." Then re-ask with OPTIONS:["My plan covers more than 10 meals a week","My plan covers 10 meals or fewer a week"]
 
 Step 4 \u2014 Exemption check:
 OPTIONS:["I work 20+ hours per week","My school offers work-study","I have a dependent child","I have a documented disability","I receive TANF","None of these apply"]
 - None \u2192 Explain meal plan blocks eligibility. Suggest UT Outpost, Central Texas Food Bank, Student Emergency Services. End warmly. STOP.
 - Any other \u2192 "That exemption qualifies you to move forward." \u2192 Set path = STUDENT_EXEMPT \u2192 go to PHASE 2
+
+MEAL PLAN CLARIFICATION — Official USDA Policy
+(Source: USDA FNS — https://www.fns.usda.gov/snap/clarification-meal-plans-institutions-higher-education)
+Issued: June 2, 2022
+
+1. DEFINITION OF INELIGIBLE MEAL PLAN:
+A student is considered a "resident of an institution" and ineligible for SNAP if their meal plan covers MORE than 50% of three daily meals — meaning more than 10 out of 21 weekly meals.
+
+2. BOTH MANDATORY AND OPTIONAL MEAL PLANS COUNT:
+Whether the school requires the meal plan or the student chose it voluntarily, both types are treated the same under SNAP rules.
+
+3. HOW TO COUNT MEALS:
+Meal plans may be structured by number of meals, points, or dollars — all should be converted to equivalent meal count.
+Example from official memo:
+- Breakfast + lunch on weekdays = 10 meals/week = does NOT block eligibility
+- Plans covering 3 meals/day (Unlimited, Level 3, 4, or higher) = blocks eligibility
+
+4. PARTIAL MEAL PLANS MAY STILL QUALIFY:
+Students with lower-tier meal plans (10 meals or fewer per week) are NOT considered institution residents and may be eligible for SNAP if they meet all other criteria.
+
+5. SCREENING REQUIREMENT:
+States must evaluate each student's meal plan individually — they cannot deny eligibility simply because a student has any meal plan.
+
+When a user asks about meal plans, cite this source and explain the 50% threshold rule in plain language.
 
 INCOME TYPES REFERENCE (Source: Texas Works Handbook A-1320 — https://www.hhs.texas.gov/handbooks/texas-works-handbook/a-1320-types-income)
 Use this to answer any questions about what counts as income for SNAP.
@@ -1213,6 +1244,47 @@ Always end with warmth. Remind them SNAP exists to help, there is no shame in ap
 let history     = [];
 let loading     = false;
 let abortCtrl   = null;   // AbortController for the active stream
+
+// ── Conversation tracking (for summary card) ───────────────────────────────────
+const HOUSEHOLD_DATA = {
+  'Just me (1 person)': { size: 1, label: '1-person',  limit: 1696,  benefit: 298  },
+  '2 people':           { size: 2, label: '2-person',  limit: 2292,  benefit: 546  },
+  '3 people':           { size: 3, label: '3-person',  limit: 2888,  benefit: 785  },
+  '4 people':           { size: 4, label: '4-person',  limit: 3483,  benefit: 994  },
+  '5 or more people':   { size: 5, label: '5+-person', limit: 4079,  benefit: 1183 },
+};
+const EXEMPTION_MAP = {
+  'I work or volunteer 80+ hours/month':    'Meets work requirement (80+ hours/month)',
+  'I have a child under 18':                'Has child under 18 (exemption applies)',
+  "I'm in a job training program":          'In job training program (exemption applies)',
+  "I'm 55 or older":                        'Age 55+ (exemption applies)',
+  "I'm a student enrolled at least half-time": 'Student exemption applies',
+  'Yes, at least half-time':                'Student exemption applies',
+};
+let snapData = {
+  householdLabel: null,   // e.g. "2-person"
+  incomeLimit:    null,   // e.g. 2292
+  exemption:      null,   // e.g. "Meets work requirement (80+ hours/month)"
+  monthlyBenefit: null,   // e.g. "546"
+  eligibilityStatus: null,// "very likely eligible"
+  email:          null,
+};
+
+function trackSnapData(text) {
+  if (HOUSEHOLD_DATA[text]) {
+    const d = HOUSEHOLD_DATA[text];
+    snapData.householdLabel  = d.label;
+    snapData.incomeLimit     = d.limit;
+    snapData.monthlyBenefit  = String(d.benefit);
+  }
+  if (EXEMPTION_MAP[text]) {
+    snapData.exemption = EXEMPTION_MAP[text];
+  }
+}
+
+function resetSnapData() {
+  snapData = { householdLabel: null, incomeLimit: null, exemption: null, monthlyBenefit: null, eligibilityStatus: null, email: null };
+}
 
 // ── DOM refs ───────────────────────────────────────────────────────────────────
 const chatArea    = document.getElementById('chatArea');
@@ -1625,9 +1697,122 @@ function createBotBubble() {
   return { wrap, msgRow, bubbleText: msgRow.querySelector('.bubble-text') };
 }
 
+// Internal tag names — sorted longest-first so we catch longer prefixes first
+const STREAMING_TAG_NAMES = [
+  'INELIGIBLE_SPLIT', 'HIGHLIGHT', 'END_LIST', 'OPTIONS',
+  'ADVISOR', 'AMOUNT', 'PHASE', 'LIST',
+];
+
+/**
+ * Strips all internal AI tags from text before displaying it in the bubble
+ * during streaming. Handles:
+ *   PHASE:N   OPTIONS:[...]   AMOUNT:$NNN   LIST:...END_LIST
+ *   HIGHLIGHT:$NNN   INELIGIBLE_SPLIT   ADVISOR:1
+ *
+ * Also trims any trailing partial-tag prefix so a tag split across chunks
+ * (e.g. "PHAS" … "E:2") never flashes in the bubble.
+ */
+function stripStreamingTags(text) {
+  // Strip complete known tags
+  text = text.replace(/PHASE:\d[^\S\n]*\n?/g, '');         // PHASE:N
+  text = text.replace(/OPTIONS:\[[^\]]*\]/g, '');           // OPTIONS:[...]
+  text = text.replace(/AMOUNT:\$[\d,]+/g, '');              // AMOUNT:$NNN
+  text = text.replace(/LIST:[\s\S]*?END_LIST/g, '');        // LIST:...END_LIST
+  text = text.replace(/HIGHLIGHT:\$[\d,]+/g, '');           // HIGHLIGHT:$NNN
+  text = text.replace(/\nINELIGIBLE_SPLIT[\s\S]*/g, '');   // INELIGIBLE_SPLIT + all after
+  text = text.replace(/ADVISOR:1[^\S\n]*\n?/g, '');        // ADVISOR:1
+
+  // Trim trailing partial tag prefix (tag split across streaming chunks).
+  // Walk from longest possible prefix down to 1 char; if the tail of `text`
+  // matches the start of any tag name, chop it off so it doesn't flash.
+  outer: for (const name of STREAMING_TAG_NAMES) {
+    for (let len = Math.min(name.length, text.length); len >= 1; len--) {
+      if (text.endsWith(name.slice(0, len))) {
+        text = text.slice(0, text.length - len);
+        break outer;
+      }
+    }
+  }
+
+  return text;
+}
+
 function updateBubbleText(bubbleText, raw) {
   bubbleText.textContent = stripMarkdownLinks(raw);
   maybeScroll();
+}
+
+// Returns true if `raw` is a structured/defined bubble that has its own
+// custom rendering path (advisor, amount, ineligible). These skip auto-formatting.
+const isDefinedBubble = (raw) =>
+  raw.includes('AMOUNT:$') ||
+  raw.includes('LIST:') ||
+  raw.includes('UT Outpost Details') ||
+  raw.includes('SNAP Eligibility Summary');
+
+// Sentence starters that signal a new paragraph should begin
+const PARA_STARTERS = [
+  'To ', 'You ', 'Here ', 'Based ', 'Since ', 'As a ',
+  'Would ', 'This means', 'That means', 'How ',
+];
+
+/**
+ * Formats a conversational bot response into auto-paragraphed <p> elements
+ * and renders them into `bubbleText`. HIGHLIGHT:$XXX tags are rendered inline
+ * as teal spans via renderHighlightText().
+ *
+ * Falls back to plain text if the response is a defined/structured bubble.
+ */
+function formatBubbleText(bubbleText, text, raw) {
+  if (isDefinedBubble(raw)) {
+    // Defined bubble slipped into plain path — render safely as plain text
+    bubbleText.textContent = stripMarkdownLinks(text);
+    return;
+  }
+
+  // Split into sentences on ". " and "! "
+  const marked = text.replace(/([.!])\s+/g, '$1\x00');
+  const sentences = marked.split('\x00').map(s => s.trim()).filter(Boolean);
+
+  // Group sentences into paragraphs:
+  // Break when the NEXT sentence starts with a known paragraph-starter keyword.
+  const paragraphs = [];
+  let current = [];
+  for (let i = 0; i < sentences.length; i++) {
+    current.push(sentences[i]);
+    const next = sentences[i + 1];
+    if (next && PARA_STARTERS.some(starter => next.startsWith(starter))) {
+      paragraphs.push(current.join(' '));
+      current = [];
+    }
+  }
+  if (current.length > 0) paragraphs.push(current.join(' '));
+
+  // Fallback: if still one long block (>200 chars), force a split before the
+  // last question sentence so the question always leads its own paragraph.
+  if (paragraphs.length === 1 && text.length > 200) {
+    const allMarked = text.replace(/([.!?])\s+/g, '$1\x00');
+    const allSents  = allMarked.split('\x00').map(s => s.trim()).filter(Boolean);
+    let lastQIdx = -1;
+    for (let i = allSents.length - 1; i >= 0; i--) {
+      if (allSents[i].endsWith('?')) { lastQIdx = i; break; }
+    }
+    if (lastQIdx > 0) {
+      paragraphs.splice(0, 1,
+        allSents.slice(0, lastQIdx).join(' '),
+        allSents.slice(lastQIdx).join(' ')
+      );
+    }
+  }
+
+  // Render each paragraph — renderHighlightText handles HIGHLIGHT:$NNN inline
+  bubbleText.innerHTML = '';
+  paragraphs.forEach((paraText, i) => {
+    const p = document.createElement('p');
+    if (i < paragraphs.length - 1) p.style.marginBottom = '8px';
+    renderHighlightText(p, paraText);
+    bubbleText.appendChild(p);
+  });
 }
 
 function finalizeMessage(wrap, msgRow, bubbleText, raw) {
@@ -1697,6 +1882,9 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
     return;
   } else if (amount) {
     // ── Rich eligible result bubble ──────────────────────────────────────────
+    // Store eligibility data for summary card
+    snapData.monthlyBenefit    = amount;
+    snapData.eligibilityStatus = 'very likely eligible';
     // Split on the blank line inserted where AMOUNT tag was
     const parts = text.split(/\n\n+/);
     const beforeAmount = stripMarkdownLinks((parts[0] || '').trim());
@@ -1813,25 +2001,7 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
 
   } else {
     // ── Plain text bubble (normal response) ──────────────────────────────────
-    const hasHighlight = /HIGHLIGHT:\$[\d,]+/.test(text);
-    const split = splitAtQuestion(text);
-    if (split) {
-      bubbleText.innerHTML = '';
-      const p1 = document.createElement('p');
-      renderHighlightText(p1, split.part1);
-      const p2 = document.createElement('p');
-      p2.style.marginTop = '0.5em';
-      renderHighlightText(p2, split.part2);
-      bubbleText.appendChild(p1);
-      bubbleText.appendChild(p2);
-    } else if (hasHighlight) {
-      bubbleText.innerHTML = '';
-      const p = document.createElement('p');
-      renderHighlightText(p, text);
-      bubbleText.appendChild(p);
-    } else {
-      bubbleText.textContent = stripMarkdownLinks(text);
-    }
+    formatBubbleText(bubbleText, text, raw);
   }
 
   attachOptions(wrap, options, phase);
@@ -1877,49 +2047,55 @@ async function callAPI(retryCount = 0) {
     let buffer = '';
     let streamDone = false;
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop(); // keep incomplete line in buffer
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // keep incomplete line in buffer
 
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const data = line.slice(6).trim();
-        if (data === '[DONE]') continue;
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') continue;
 
-        let parsed;
-        try { parsed = JSON.parse(data); } catch { continue; }
+          let parsed;
+          try { parsed = JSON.parse(data); } catch { continue; }
 
-        if (parsed.type === 'error') {
-          const sseErr = new Error(parsed.error?.message || 'API error');
-          sseErr.retryable = /overload|529|503/i.test(sseErr.message);
-          throw sseErr;
-        }
-
-        if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
-          const token = parsed.delta.text;
-          if (!token) continue;
-
-          if (firstChunk) {
-            hideTyping();
-            chatArea.appendChild(wrap);
-            firstChunk = false;
+          if (parsed.type === 'error') {
+            const sseErr = new Error(parsed.error?.message || 'API error');
+            sseErr.retryable = /overload|529|503/i.test(sseErr.message);
+            throw sseErr;
           }
 
-          raw += token;
-          // Update DOM directly on every token — genuine token-by-token streaming
-          // Hide the split token during streaming so it doesn't flash in the bubble
-          bubbleText.textContent = stripMarkdownLinks(raw.replace(/\nINELIGIBLE_SPLIT\n?[\s\S]*/g, ''));
-          maybeScroll();
-        }
+          if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
+            const token = parsed.delta.text;
+            if (!token) continue;
 
-        if (parsed.type === 'message_stop') {
-          streamDone = true;
+            if (firstChunk) {
+              hideTyping();
+              chatArea.appendChild(wrap);
+              firstChunk = false;
+            }
+
+            raw += token;
+            // Strip all internal tags before updating the DOM so they never
+            // appear as raw text in the bubble during streaming.
+            bubbleText.textContent = stripMarkdownLinks(stripStreamingTags(raw));
+            maybeScroll();
+          }
+
+          if (parsed.type === 'message_stop') {
+            streamDone = true;
+          }
         }
       }
+    } finally {
+      // Always release the reader — no-op if stream finished cleanly,
+      // signals abort/cancel if the stream errored or was cut short.
+      try { reader.cancel(); } catch {}
     }
 
     // Stream complete — finalize
@@ -1939,7 +2115,7 @@ async function callAPI(retryCount = 0) {
     if (err.name === 'AbortError') {
       // User hit Stop — finalize whatever was received
       if (raw) {
-        bubbleText.textContent = stripMarkdownLinks(raw);
+        bubbleText.textContent = stripMarkdownLinks(stripStreamingTags(raw));
         history.push({ role: 'assistant', content: raw });
         finalizeMessage(wrap, msgRow, bubbleText, raw);
       } else {
@@ -1988,10 +2164,29 @@ async function callAPI(retryCount = 0) {
 }
 
 // ── User Input ─────────────────────────────────────────────────────────────────
+// Cap conversation history to avoid unbounded memory growth.
+// Always trims from the oldest end; the system prompt is sent separately
+// and is never stored in history, so no context is lost.
+function trimHistory(maxMessages = 50) {
+  if (history.length > maxMessages) {
+    history = history.slice(history.length - maxMessages);
+  }
+}
+
 async function handleUserMessage(text) {
   if (loading) return;
 
+  // Track conversation data for summary card
+  trackSnapData(text);
+
   addMessage('user', text);
+
+  // Intercept "I'll apply later" — render summary card, skip API
+  if (text === "I'll apply later") {
+    history.push({ role: 'user', content: text });
+    renderSummaryBubble();
+    return;
+  }
 
   if (pendingFile) {
     const content = [
@@ -2005,6 +2200,7 @@ async function handleUserMessage(text) {
     history.push({ role: 'user', content: text });
   }
 
+  trimHistory();
   await callAPI();
 }
 
@@ -2321,8 +2517,170 @@ function addGreetingBubble(text) {
   scrollBottom();
 }
 
+// ── Summary Card (rendered when user selects "I'll apply later") ───────────────
+function renderSummaryBubble() {
+  const { wrap, msgRow, bubbleText } = createBotBubble();
+  bubbleText.classList.remove('streaming');
+  bubbleText.removeAttribute('aria-label');
+  msgRow.querySelector('.bubble')?.classList.remove('streaming-bubble');
+
+  // Title
+  const title = document.createElement('p');
+  title.textContent = 'SNAP Eligibility Summary';
+  title.style.fontWeight = '600';
+  title.style.color = '#1e293b';
+  bubbleText.appendChild(title);
+
+  // Status row
+  const statusP = document.createElement('p');
+  statusP.style.marginTop = '6px';
+  statusP.appendChild(document.createTextNode('Your status: '));
+  const statusSpan = document.createElement('span');
+  statusSpan.textContent = snapData.eligibilityStatus || 'very likely eligible';
+  statusSpan.style.color = '#24872e';
+  statusSpan.style.fontWeight = '600';
+  statusP.appendChild(statusSpan);
+  bubbleText.appendChild(statusP);
+
+  // Bullet list
+  const ul = document.createElement('ul');
+  ul.style.paddingLeft = '21px';
+  ul.style.marginTop = '8px';
+  ul.style.display = 'flex';
+  ul.style.flexDirection = 'column';
+  ul.style.gap = '4px';
+
+  const items = [];
+  if (snapData.householdLabel)  items.push(`${snapData.householdLabel} household`);
+  if (snapData.incomeLimit)     items.push(`Income below $${snapData.incomeLimit.toLocaleString()}/month limit`);
+  if (snapData.exemption)       items.push(snapData.exemption);
+  if (snapData.monthlyBenefit)  items.push(`Potential monthly benefit: up to $${snapData.monthlyBenefit}`);
+
+  items.forEach(item => {
+    const li = document.createElement('li');
+    li.textContent = item;
+    li.style.fontSize = '14px';
+    li.style.color = '#1e293b';
+    ul.appendChild(li);
+  });
+  bubbleText.appendChild(ul);
+
+  // CTA question
+  const question = document.createElement('p');
+  question.style.marginTop = '10px';
+  question.textContent = 'Would you like me to send this information for you?';
+  bubbleText.appendChild(question);
+
+  chatArea.appendChild(wrap);
+  scrollBottom();
+
+  // Quick replies
+  const qrWrap = document.createElement('div');
+  qrWrap.className = 'quick-replies';
+  ['Yes, send it to my email', 'No thanks'].forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'qr-btn';
+    btn.textContent = opt;
+    btn.addEventListener('click', () => {
+      qrWrap.querySelectorAll('.qr-btn').forEach(b => b.disabled = true);
+      addMessage('user', opt);
+      if (opt === 'Yes, send it to my email') renderEmailInput();
+      else renderNoThanks();
+    });
+    qrWrap.appendChild(btn);
+  });
+  wrap.appendChild(qrWrap);
+}
+
+function renderEmailInput() {
+  const { wrap, msgRow, bubbleText } = createBotBubble();
+  bubbleText.classList.remove('streaming');
+  bubbleText.removeAttribute('aria-label');
+  msgRow.querySelector('.bubble')?.classList.remove('streaming-bubble');
+
+  const p = document.createElement('p');
+  p.textContent = 'What\'s your email address?';
+  bubbleText.appendChild(p);
+
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:8px;margin-top:10px;align-items:center';
+
+  const input = document.createElement('input');
+  input.type = 'email';
+  input.placeholder = 'your@email.com';
+  input.style.cssText = 'flex:1;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:14px;font-family:inherit;outline:none;color:#1e293b';
+
+  const submitBtn = document.createElement('button');
+  submitBtn.textContent = 'Send';
+  submitBtn.style.cssText = 'background:#1e827d;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit';
+
+  const onSubmit = () => {
+    const email = input.value.trim();
+    if (!email || !email.includes('@')) {
+      input.style.borderColor = '#ef4444';
+      return;
+    }
+    snapData.email = email;
+    input.disabled = true;
+    submitBtn.disabled = true;
+    submitBtn.style.opacity = '0.5';
+    renderEmailConfirmation(email);
+  };
+
+  submitBtn.addEventListener('click', onSubmit);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') onSubmit(); });
+  input.addEventListener('input', () => { input.style.borderColor = '#e2e8f0'; });
+
+  row.appendChild(input);
+  row.appendChild(submitBtn);
+  bubbleText.appendChild(row);
+
+  chatArea.appendChild(wrap);
+  scrollBottom();
+  setTimeout(() => input.focus(), 50);
+}
+
+function renderEmailConfirmation(email) {
+  const { wrap, msgRow, bubbleText } = createBotBubble();
+  bubbleText.classList.remove('streaming');
+  bubbleText.removeAttribute('aria-label');
+  msgRow.querySelector('.bubble')?.classList.remove('streaming-bubble');
+
+  bubbleText.innerHTML = '';
+  const p1 = document.createElement('p');
+  p1.textContent = 'Got it! We\'ve noted your summary.';
+  const p2 = document.createElement('p');
+  p2.style.marginTop = '0.5em';
+  p2.textContent = 'You can apply anytime at YourTexasBenefits.com — your situation hasn\'t changed.';
+  bubbleText.appendChild(p1);
+  bubbleText.appendChild(p2);
+
+  chatArea.appendChild(wrap);
+  scrollBottom();
+}
+
+function renderNoThanks() {
+  const { wrap, msgRow, bubbleText } = createBotBubble();
+  bubbleText.classList.remove('streaming');
+  bubbleText.removeAttribute('aria-label');
+  msgRow.querySelector('.bubble')?.classList.remove('streaming-bubble');
+
+  bubbleText.innerHTML = '';
+  const p1 = document.createElement('p');
+  p1.textContent = 'No problem. You can always come back when you\'re ready.';
+  const p2 = document.createElement('p');
+  p2.style.marginTop = '0.5em';
+  p2.textContent = 'Apply at YourTexasBenefits.com anytime — your situation hasn\'t changed.';
+  bubbleText.appendChild(p1);
+  bubbleText.appendChild(p2);
+
+  chatArea.appendChild(wrap);
+  scrollBottom();
+}
+
 function startChat() {
   history = [];
+  resetSnapData();
 
   const bubble1 = "Hi! I'm your SNAP Benefits Assistant, here to help you figure out if you qualify. Feel free to ask about anything you're unsure of.";
   const bubble2 = "To make sure I give you the most accurate information, what state are you currently living in?";
