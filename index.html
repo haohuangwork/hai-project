@@ -2655,22 +2655,66 @@ function renderEmailInput() {
   setTimeout(() => input.focus(), 50);
 }
 
-function renderEmailConfirmation(email) {
+function buildEmailSummary() {
+  return {
+    status:         snapData.eligibilityStatus || 'likely eligible',
+    householdSize:  snapData.householdLabel    ? `${snapData.householdLabel} household` : 'N/A',
+    incomeLimit:    snapData.incomeLimit       ? `$${Number(snapData.incomeLimit).toLocaleString()}/month limit` : 'N/A',
+    exemption:      snapData.exemption         || 'N/A',
+    monthlyBenefit: snapData.monthlyBenefit    ? `up to $${snapData.monthlyBenefit}/month` : 'N/A',
+  };
+}
+
+async function renderEmailConfirmation(email) {
   const { wrap, msgRow, bubbleText } = createBotBubble();
   bubbleText.classList.remove('streaming');
   bubbleText.removeAttribute('aria-label');
   msgRow.querySelector('.bubble')?.classList.remove('streaming-bubble');
 
-  bubbleText.innerHTML = '';
-  const p1 = document.createElement('p');
-  p1.textContent = 'Got it! We\'ve noted your summary.';
-  const p2 = document.createElement('p');
-  p2.style.marginTop = '0.5em';
-  p2.textContent = 'You can apply anytime at YourTexasBenefits.com — your situation hasn\'t changed.';
-  bubbleText.appendChild(p1);
-  bubbleText.appendChild(p2);
-
+  // Show sending state immediately
+  const statusP = document.createElement('p');
+  statusP.textContent = 'Sending your summary…';
+  statusP.style.color = '#64748b';
+  bubbleText.appendChild(statusP);
   chatArea.appendChild(wrap);
+  scrollBottom();
+
+  try {
+    const res = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, summary: buildEmailSummary() }),
+    });
+
+    bubbleText.innerHTML = '';
+    if (res.ok) {
+      const p1 = document.createElement('p');
+      p1.textContent = `Done! Your summary is on its way to ${email}.`;
+      const p2 = document.createElement('p');
+      p2.style.marginTop = '0.5em';
+      p2.textContent = 'You can apply anytime at YourTexasBenefits.com — your situation hasn\'t changed.';
+      bubbleText.appendChild(p1);
+      bubbleText.appendChild(p2);
+    } else {
+      const p1 = document.createElement('p');
+      p1.textContent = 'Sorry, we couldn\'t send the email right now.';
+      const p2 = document.createElement('p');
+      p2.style.marginTop = '0.5em';
+      p2.textContent = 'You can apply anytime at YourTexasBenefits.com — your situation hasn\'t changed.';
+      bubbleText.appendChild(p1);
+      bubbleText.appendChild(p2);
+    }
+  } catch {
+    bubbleText.innerHTML = '';
+    const p1 = document.createElement('p');
+    p1.textContent = 'Sorry, we couldn\'t send the email right now.';
+    const p2 = document.createElement('p');
+    p2.style.marginTop = '0.5em';
+    p2.textContent = 'You can apply anytime at YourTexasBenefits.com — your situation hasn\'t changed.';
+    bubbleText.appendChild(p1);
+    bubbleText.appendChild(p2);
+  }
+
   scrollBottom();
 }
 
