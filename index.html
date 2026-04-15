@@ -2497,6 +2497,7 @@ async function sendMessage() {
   const text = msgInput.value.trim();
   if ((!text && !pendingFile) || loading) return;
   msgInput.value = '';
+  voiceAccumulatedText = '';   // FIX 2: reset accumulator on send
   resizeTextarea();
   await handleUserMessage(text);
 }
@@ -2534,13 +2535,17 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 const voiceStopBtn = document.getElementById('voiceStopBtn');
 const voiceTimer   = document.getElementById('voiceTimer');
 
+// FIX 2: persists across recording sessions; reset on send
+let voiceAccumulatedText = '';
+
 if (SpeechRecognition) {
   const recognition = new SpeechRecognition();
   recognition.lang = 'en-US';
   recognition.interimResults = true;
-  recognition.continuous = false;
+  recognition.continuous = true;   // FIX 1: don't auto-stop on silence
 
   let isRecording   = false;
+  let userStopped   = false;       // FIX 1: track explicit user stop
   let timerInterval = null;
   let timerSeconds  = 0;
 
@@ -2658,33 +2663,68 @@ if (SpeechRecognition) {
   }
 
   micBtn.addEventListener('click', () => {
-    if (isRecording) { recognition.stop(); return; }
+    if (isRecording) { userStopped = true; recognition.stop(); return; }
     recognition.start();
   });
 
   voiceStopBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (isRecording) recognition.stop();
+    if (isRecording) { userStopped = true; recognition.stop(); }
   });
 
   recognition.addEventListener('start', () => {
-    isRecording = true;
-    enterVoiceMode();
+    if (!isRecording) {
+      // First start of a new user-initiated session
+      isRecording = true;
+      enterVoiceMode();
+    }
+    // If restarting after browser auto-stop, already in voice mode — no-op
   });
 
   recognition.addEventListener('result', (e) => {
-    msgInput.value = Array.from(e.results).map(r => r[0].transcript).join('');
+    // FIX 2: append isFinal results to accumulator; show interim as live preview
+    let interimText = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const result = e.results[i];
+      if (result.isFinal) {
+        const t = result[0].transcript.trim();
+        if (t) voiceAccumulatedText += (voiceAccumulatedText ? ' ' : '') + t;
+      } else {
+        interimText += result[0].transcript;
+      }
+    }
+    const preview = interimText.trim();
+    msgInput.value = voiceAccumulatedText +
+      (preview ? (voiceAccumulatedText ? ' ' : '') + preview : '');
     resizeTextarea();
   });
 
   recognition.addEventListener('end', () => {
+    if (isRecording && !userStopped) {
+      // FIX 1: auto-stopped by browser (silence timeout) — restart silently
+      try { recognition.start(); } catch (_) {}
+      return;
+    }
+    // User explicitly stopped
     isRecording = false;
+    userStopped = false;
     exitVoiceMode();
   });
 
-  recognition.addEventListener('error', () => {
+  recognition.addEventListener('error', (e) => {
+    // 'no-speech' is non-fatal — restart silently so recording continues
+    if (isRecording && !userStopped && e.error === 'no-speech') {
+      try { recognition.start(); } catch (_) {}
+      return;
+    }
     isRecording = false;
+    userStopped = false;
     exitVoiceMode();
+  });
+
+  // FIX 2: keep accumulator in sync when user manually edits the input field
+  msgInput.addEventListener('input', () => {
+    if (!isRecording) voiceAccumulatedText = msgInput.value;
   });
 } else {
   micBtn.style.display = 'none';
