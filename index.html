@@ -123,6 +123,13 @@
       overflow: visible;
     }
     .message.bot .bubble.streaming-bubble .msg-time { display: none; }
+    @keyframes wordFadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    .new-word {
+      animation: wordFadeIn 0.15s ease-out forwards;
+    }
     .bubble-text {
       font-size: 14px;
       font-weight: 500;
@@ -2415,6 +2422,51 @@ async function callAPI(retryCount = 0) {
   let raw        = '';
   let firstChunk = true;
 
+  // ── Word-by-word streaming animation ────────────────────────────────────────
+  let wordQueue     = [];   // word units waiting to be displayed
+  let wordBuffer    = '';   // chars not yet split into complete word units
+  let wordTicking   = false;
+  let displayedText = '';   // stripped text already rendered as word spans
+
+  function getWordDelay(word) {
+    const t = word.trimEnd();
+    if (/[.!?]$/.test(t)) return 120;  // sentence end — longer pause
+    if (/[,;:]$/.test(t)) return 60;   // clause break — medium pause
+    return 35;                          // normal word
+  }
+
+  function tickWord() {
+    if (!wordTicking || wordQueue.length === 0) { wordTicking = false; return; }
+    const word = wordQueue.shift();
+    const span = document.createElement('span');
+    span.className = 'new-word';
+    span.textContent = word;
+    bubbleText.appendChild(span);
+    maybeScroll();
+    setTimeout(() => span.classList.remove('new-word'), 200);
+    setTimeout(tickWord, getWordDelay(word));
+  }
+
+  function enqueueNewChars(newChars) {
+    wordBuffer += newChars;
+    // Extract complete word units (word + trailing whitespace) from front of buffer
+    const lastSpace = wordBuffer.lastIndexOf(' ');
+    if (lastSpace !== -1) {
+      const completed = wordBuffer.slice(0, lastSpace + 1);
+      wordBuffer = wordBuffer.slice(lastSpace + 1);
+      const words = completed.match(/\S+\s*/g) || [];
+      wordQueue.push(...words);
+    }
+    if (!wordTicking && wordQueue.length > 0) { wordTicking = true; tickWord(); }
+  }
+
+  function stopWordTicker() {
+    wordTicking = false;
+    wordQueue   = [];
+    wordBuffer  = '';
+  }
+  // ────────────────────────────────────────────────────────────────────────────
+
   try {
     const response = await fetch('/api/chat', {
       method: 'POST',
@@ -2476,10 +2528,13 @@ async function callAPI(retryCount = 0) {
             raw += token;
             // Safety guard: discard if thinking content leaked through as raw text
             if (/^\s*<thinking>/i.test(raw)) { raw = ''; continue; }
-            // Strip all internal tags before updating the DOM so they never
-            // appear as raw text in the bubble during streaming.
-            bubbleText.textContent = stripMarkdownLinks(stripStreamingTags(raw));
-            maybeScroll();
+
+            // Diff the newly visible stripped text against what's already displayed,
+            // then queue the delta as word units for timed fade-in rendering.
+            const stripped = stripMarkdownLinks(stripStreamingTags(raw));
+            const newChars = stripped.slice(displayedText.length);
+            displayedText  = stripped;
+            if (newChars) enqueueNewChars(newChars);
           }
 
           if (parsed.type === 'message_stop') {
@@ -2492,6 +2547,9 @@ async function callAPI(retryCount = 0) {
       // signals abort/cancel if the stream errored or was cut short.
       try { reader.cancel(); } catch {}
     }
+
+    // Stream complete — stop word ticker (finalizeMessage rebuilds bubbleText)
+    stopWordTicker();
 
     // Stream complete — finalize
     if (!firstChunk) {
@@ -2508,9 +2566,9 @@ async function callAPI(retryCount = 0) {
 
   } catch (err) {
     if (err.name === 'AbortError') {
-      // User hit Stop — finalize whatever was received
+      // User hit Stop — stop word ticker, then finalize whatever was received
+      stopWordTicker();
       if (raw) {
-        bubbleText.textContent = stripMarkdownLinks(stripStreamingTags(raw));
         history.push({ role: 'assistant', content: raw });
         finalizeMessage(wrap, msgRow, bubbleText, raw);
       } else {
