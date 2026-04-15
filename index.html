@@ -1314,7 +1314,7 @@ UT Outpost Details:
 - Website: https://deanofstudents.utexas.edu/emergency/utoutpost.php
 
 To schedule an appointment, you can:
-OPTIONS:["Book SNAP advising session","Call to book an appointment: 512-471-6242"]
+OPTIONS:["Book SNAP advising session"]
 
 - "I'll apply later" \u2192 The frontend handles this directly with a summary card. Do NOT generate a response for this option.
 
@@ -1482,7 +1482,6 @@ function attachOptions(wrap, options, phase, advisor = false) {
     // Advisor-specific buttons — rendered as links, not chat messages
     const advisorActions = [
       { text: 'Book SNAP advising session', href: 'https://outlook.office.com/book/SNAPBenefitsAdvising@utexas.onmicrosoft.com/', tel: false },
-      { text: 'Call to book an appointment: 512-471-6242', href: 'tel:512-471-6242', tel: true },
     ];
     advisorActions.forEach(action => {
       const a = document.createElement('a');
@@ -2177,8 +2176,7 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
                 const qrA = document.createElement('div');
                 qrA.className = 'quick-replies';
                 [
-                  { label: 'Book SNAP advising session',        href: 'https://outlook.office.com/book/SNAPBenefitsAdvising@utexas.onmicrosoft.com/', tel: false },
-                  { label: 'Call to book \u2014 512-471-6242',  href: 'tel:512-471-6242', tel: true },
+                  { label: 'Book SNAP advising session', href: 'https://outlook.office.com/book/SNAPBenefitsAdvising@utexas.onmicrosoft.com/', tel: false },
                 ].forEach(({ label, href, tel }) => {
                   const aEl = document.createElement('a');
                   aEl.className = 'qr-btn'; aEl.textContent = label; aEl.href = href;
