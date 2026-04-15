@@ -464,6 +464,24 @@
       transition: background 0.15s;
     }
     .apply-cta-btn:hover { background: #196b67; }
+    .blist-section-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-top: 10px;
+      margin-bottom: 4px;
+    }
+    .blist-section-label:first-of-type { margin-top: 8px; }
+    .blist-section-list {
+      font-size: 14px;
+      color: #1e293b;
+      line-height: 1.6;
+      padding-left: 16px;
+      margin: 0 0 10px 0;
+      list-style: disc;
+    }
     .benefit-amount {
       display: flex;
       align-items: baseline;
@@ -1318,7 +1336,46 @@ OPTIONS:["Book SNAP advising session"]
 
 - "I'll apply later" \u2192 The frontend handles this directly with a summary card. Do NOT generate a response for this option.
 
-Always end with warmth. Remind them SNAP exists to help, there is no shame in applying.`;
+Always end with warmth. Remind them SNAP exists to help, there is no shame in applying.
+
+\u2501\u2501\u2501 BLIST FORMAT \u2501\u2501\u2501
+Use BLIST format to display categorized bullet lists. The frontend renders each SECTION as a labeled group.
+Format:
+BLIST:
+SECTION:Category Name
+- Item 1
+- Item 2
+END_SECTION
+SECTION:Another Category
+- Item A
+END_BLIST
+
+When user asks what counts as income for SNAP (e.g. "What counts as income?", "What income types count?"), respond with EXACTLY this:
+
+Here's what counts as income for SNAP:
+BLIST:
+SECTION:Earned income
+- Wages and salaries from a job
+- Self-employment income
+- Tips and commissions
+- Military base pay
+END_SECTION
+SECTION:Unearned income
+- Social Security or disability benefits
+- Unemployment benefits
+- Child support received
+- TANF cash assistance
+END_SECTION
+SECTION:Does not count
+- Financial aid and scholarships used for school expenses
+- Federal tax refunds and EIC payments
+- Loans that must be repaid
+END_BLIST
+
+If your scholarship includes a living stipend, that portion may count as unearned income. The limit is based on your total gross income before taxes from all sources combined.
+
+[Texas Works Handbook A-1320](https://www.hhs.texas.gov/handbooks/texas-works-handbook/a-1320-types-income)
+`;
 
 // ── State ──────────────────────────────────────────────────────────────────────
 let history     = [];
@@ -1448,7 +1505,27 @@ function parseResponse(raw) {
   const advisorM = text.match(/^ADVISOR:1\s*\n?/);
   if (advisorM) { advisor = true; text = text.slice(advisorM[0].length).trim(); }
 
-  return { phase, options, text, amount, listItems, advisor };
+  // BLIST tag — categorized bullet list with section headers
+  let blistData = null;
+  const blistM = text.match(/BLIST:\n([\s\S]*?)\nEND_BLIST/);
+  if (blistM) {
+    blistData = [];
+    const content = blistM[1];
+    const sectionRe = /SECTION:([^\n]+)\n([\s\S]*?)(?:\nEND_SECTION|$)/g;
+    let sm;
+    while ((sm = sectionRe.exec(content)) !== null) {
+      const title = sm[1].trim();
+      const items = sm[2].split('\n')
+        .filter(l => l.trim().startsWith('- '))
+        .map(l => l.trim().slice(2).trim())
+        .filter(Boolean);
+      if (title) blistData.push({ title, items });
+    }
+    // Replace BLIST block with a split marker so finalizeMessage can position intro/outro
+    text = text.replace(/\n?BLIST:\n[\s\S]*?\nEND_BLIST\n?/, '\n\n\x01BLISTSPLIT\x01\n\n').trim();
+  }
+
+  return { phase, options, text, amount, listItems, advisor, blistData };
 }
 
 // Split text into (statement paragraph, question paragraph) for single-bubble rendering.
@@ -1783,6 +1860,7 @@ function createBotBubble() {
 const STREAMING_TAG_NAMES = [
   'INELIGIBLE_SPLIT', 'HIGHLIGHT', 'END_LIST', 'OPTIONS',
   'ADVISOR', 'AMOUNT', 'PHASE', 'LIST',
+  'END_BLIST', 'END_SECTION', 'BLIST', 'SECTION',
 ];
 
 /**
@@ -1803,6 +1881,10 @@ function stripStreamingTags(text) {
   text = text.replace(/HIGHLIGHT:\$[\d,]+/g, '');           // HIGHLIGHT:$NNN
   text = text.replace(/\nINELIGIBLE_SPLIT[\s\S]*/g, '');   // INELIGIBLE_SPLIT + all after
   text = text.replace(/ADVISOR:1[^\S\n]*\n?/g, '');        // ADVISOR:1
+  text = text.replace(/BLIST:[\s\S]*?END_BLIST[^\S\n]*\n?/g, ''); // complete BLIST block
+  if (text.includes('BLIST:')) text = text.slice(0, text.indexOf('BLIST:')); // partial BLIST
+  text = text.replace(/SECTION:[^\n]*\n?/g, '');            // SECTION:Title
+  text = text.replace(/END_SECTION[^\S\n]*\n?/g, '');       // END_SECTION
 
   // Trim trailing partial tag prefix (tag split across streaming chunks).
   // Walk from longest possible prefix down to 1 char; if the tail of `text`
@@ -1829,6 +1911,7 @@ function updateBubbleText(bubbleText, raw) {
 const isDefinedBubble = (raw) =>
   raw.includes('AMOUNT:$') ||
   raw.includes('LIST:') ||
+  raw.includes('BLIST:') ||
   raw.includes('UT Outpost Details') ||
   raw.includes('SNAP Eligibility Summary');
 
@@ -1902,7 +1985,7 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
   bubbleText.removeAttribute('aria-label');
   msgRow.querySelector('.bubble')?.classList.remove('streaming-bubble');
 
-  const { phase, options, text, amount, listItems, advisor } = parseResponse(raw);
+  const { phase, options, text, amount, listItems, advisor, blistData } = parseResponse(raw);
   if (phase) setPhase(phase);
 
   function done() {
@@ -2220,6 +2303,42 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
       }, 600);
     }, 800);
     return; // done() called inside the nested timeouts above
+
+  } else if (blistData) {
+    // ── Categorized bullet list bubble (BLIST format) ─────────────────────────
+    bubbleText.innerHTML = '';
+    const blistParts = text.split('\x01BLISTSPLIT\x01');
+    const blistBefore = (blistParts[0] || '').trim();
+    const blistAfter  = (blistParts[1] || '').trim();
+
+    if (blistBefore) {
+      const p = document.createElement('p');
+      p.textContent = stripMarkdownLinks(blistBefore);
+      bubbleText.appendChild(p);
+    }
+
+    blistData.forEach(({ title, items }) => {
+      const label = document.createElement('div');
+      label.className = 'blist-section-label';
+      label.textContent = title;
+      bubbleText.appendChild(label);
+
+      const ul = document.createElement('ul');
+      ul.className = 'blist-section-list';
+      items.forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = item;
+        ul.appendChild(li);
+      });
+      bubbleText.appendChild(ul);
+    });
+
+    if (blistAfter) {
+      const p2 = document.createElement('p');
+      p2.style.marginTop = '10px';
+      p2.textContent = stripMarkdownLinks(blistAfter);
+      bubbleText.appendChild(p2);
+    }
 
   } else {
     // ── Plain text bubble (normal response) ──────────────────────────────────
