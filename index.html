@@ -1115,7 +1115,9 @@
 'use strict';
 
 // ── System Prompt ──────────────────────────────────────────────────────────────
-const SYSTEM_PROMPT = `You are a warm, knowledgeable SNAP Benefits Assistant helping people in Texas figure out if they qualify for food assistance. You are like a knowledgeable friend, professional but friendly, clear but not robotic.
+const SYSTEM_PROMPT = `OUTPUT FORMAT: Plain text only. No markdown. No ## headers. No ** bold. No bullet points with -. No --- dividers. Every response about SNAP policy MUST end with a citation link: [Source Name](URL)
+
+You are a warm, knowledgeable SNAP Benefits Assistant helping people in Texas figure out if they qualify for food assistance. You are like a knowledgeable friend, professional but friendly, clear but not robotic.
 
 IDENTITY AND SCOPE:
 You are a SNAP-specific assistant. Your ONLY purpose is to help users understand SNAP eligibility in Texas.
@@ -2299,6 +2301,64 @@ function formatBubbleText(bubbleText, text, raw) {
   });
 }
 
+// ── Post-processing ────────────────────────────────────────────────────────────
+
+/**
+ * Returns true if `text` contains SNAP policy content that warrants a citation.
+ */
+function detectsPolicyContent(text) {
+  return (
+    /\$[\d,]+/.test(text) ||
+    /\d+\s*hours?/i.test(text) ||
+    /\d+%/.test(text) ||
+    /income limit|gross income|net income|eligible|eligibility|exempt|exemption|work requirement|meal plan|household|benefit amount|july 2023|snap rules|student restriction/i.test(text)
+  );
+}
+
+/**
+ * Post-processes Claude's raw response before the bubble is finalized:
+ *   1. Strips markdown formatting (headers, bold, italic, dividers, blockquotes).
+ *      Internal tags (OPTIONS:, PHASE:, HIGHLIGHT:, INELIGIBLE_SPLIT, etc.) and
+ *      citation links [Label](URL) are intentionally preserved.
+ *   2. If the cleaned text contains policy content but no citation link,
+ *      appends [USDA FNS SNAP](...) as a fallback so the Sources chip always
+ *      appears on policy-related bubbles.
+ *
+ * Returns { cleanText, citation } where citation is the fallback URL that was
+ * appended, or null if the response already had a citation or has no policy content.
+ */
+function postProcessResponse(rawText) {
+  let text = rawText;
+
+  // 1 — Strip markdown (preserve internal tags and [Label](URL) links)
+  text = text.replace(/^#{1,6}\s+(.*)$/gm, '$1');          // ## Heading → plain text
+  text = text.replace(/^-{3,}\s*$/gm, '');                  // --- horizontal rules
+  text = text.replace(/^={3,}\s*$/gm, '');                  // === horizontal rules
+  text = text.replace(/^>\s?/gm, '');                       // > blockquotes — keep text
+  text = text.replace(/\*\*([^*\n]+)\*\*/g, '$1');          // **bold** → text
+  text = text.replace(/(?<!\*)\*(?!\*)([^*\n]+)(?<!\*)\*(?!\*)/g, '$1'); // *italic* → text
+  text = text.replace(/\n{3,}/g, '\n\n');                   // collapse excess blank lines
+
+  // 2 — Enforce citation on policy responses
+  const hasCitationLink = /\[[^\]]+\]\(https?:\/\/[^\)\s]+\)/.test(text);
+  let citation = null;
+
+  if (detectsPolicyContent(text) && !hasCitationLink) {
+    citation = 'https://www.fns.usda.gov/snap/recipient/eligibility';
+    const fallbackLink = '\n\n[USDA FNS SNAP](https://www.fns.usda.gov/snap/recipient/eligibility)';
+    // Insert before a trailing PHASE: tag so the citation stays part of the message
+    const phaseMatch = text.match(/\nPHASE:\d\s*$/);
+    if (phaseMatch) {
+      const phaseIdx = text.lastIndexOf(phaseMatch[0]);
+      text = text.slice(0, phaseIdx) + fallbackLink + text.slice(phaseIdx);
+    } else {
+      text = text.trimEnd() + fallbackLink;
+    }
+  }
+
+  return { cleanText: text, citation };
+}
+
 function finalizeMessage(wrap, msgRow, bubbleText, raw) {
   bubbleText.classList.remove('streaming');
   bubbleText.removeAttribute('aria-label');
@@ -2826,8 +2886,9 @@ async function callAPI(retryCount = 0) {
 
     // Stream complete — finalize
     if (!firstChunk) {
+      const { cleanText } = postProcessResponse(raw);
       history.push({ role: 'assistant', content: raw });
-      finalizeMessage(wrap, msgRow, bubbleText, raw);
+      finalizeMessage(wrap, msgRow, bubbleText, cleanText);
     } else {
       // No content received
       hideTyping();
@@ -2842,8 +2903,9 @@ async function callAPI(retryCount = 0) {
       // User hit Stop — stop word ticker, then finalize whatever was received
       stopWordTicker();
       if (raw) {
+        const { cleanText: cleanTextStop } = postProcessResponse(raw);
         history.push({ role: 'assistant', content: raw });
-        finalizeMessage(wrap, msgRow, bubbleText, raw);
+        finalizeMessage(wrap, msgRow, bubbleText, cleanTextStop);
       } else {
         hideTyping();
         loading = false;
