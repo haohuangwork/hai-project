@@ -2377,15 +2377,6 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
     const splitIdx = text.indexOf('INELIGIBLE_SPLIT');
     const msg1 = text.slice(0, splitIdx).trim();
 
-    // Detect ineligibility reason so the third bubble can show a context-aware option
-    if (/meal plan|institution resident|50%|more than 10 meal/i.test(msg1)) {
-      snapData.path = 'BLOCKED_MEAL_PLAN';
-    } else if (/work requirement|work rule|ABAWD|20 hour/i.test(msg1)) {
-      snapData.path = 'BLOCKED_WORK_RULES';
-    } else if (/income|gross income|over the limit/i.test(msg1)) {
-      snapData.path = 'BLOCKED_INCOME';
-    }
-
     // Bubble 1 — reason text (with citations from AI)
     bubbleText.innerHTML = '';
     const parts1 = msg1.split(/\n\n+/);
@@ -2398,11 +2389,23 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
     attachCitations(msg1, wrap, msgRow);
     scrollBottom();
 
-    // Bubble 2 — hardcoded resources
+    // Bubble 2 — hardcoded resources (name + description + URL)
     const RESOURCES = [
-      { label: 'UT Outpost \u2013 Emergency food assistance',           url: 'https://deanofstudents.utexas.edu/emergency/utoutpost.php' },
-      { label: 'Central Texas Food Bank \u2013 Free food distributions', url: 'https://www.centraltexasfoodbank.org' },
-      { label: 'Student Emergency Services \u2013 Financial support',   url: 'https://deanofstudents.utexas.edu/emergency' },
+      {
+        name: 'UT Outpost',
+        desc: 'Free groceries, hygiene items, and on-campus food support for UT students.',
+        url:  'https://deanofstudents.utexas.edu/emergency/utoutpost.php',
+      },
+      {
+        name: 'Central Texas Food Bank',
+        desc: 'Find local food pantries and free distribution events near you.',
+        url:  'https://www.centraltexasfoodbank.org',
+      },
+      {
+        name: 'Student Emergency Services',
+        desc: 'Short-term financial assistance for students facing unexpected hardships.',
+        url:  'https://deanofstudents.utexas.edu/emergency',
+      },
     ];
 
     setTimeout(() => {
@@ -2413,22 +2416,41 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
         bt2.innerHTML = '';
 
         const intro2 = document.createElement('p');
-        intro2.textContent = 'However, there are other resources available to support you:';
+        intro2.textContent = 'There are still resources that can help right now:';
         bt2.appendChild(intro2);
 
-        RESOURCES.forEach(({ label, url }) => {
-          const labelP = document.createElement('p');
-          labelP.style.marginTop = '10px';
-          labelP.textContent = '\u2022 ' + label;
-          bt2.appendChild(labelP);
+        RESOURCES.forEach(({ name, desc, url }, idx) => {
+          const block = document.createElement('div');
+          block.style.marginTop = idx === 0 ? '10px' : '10px';
 
-          const linkP = document.createElement('p');
-          linkP.style.marginTop = '2px';
+          const nameP = document.createElement('p');
+          nameP.textContent = name;
+          nameP.style.fontSize = '14px';
+          nameP.style.fontWeight = '500';
+          nameP.style.color = '#1e293b';
+          nameP.style.margin = '0';
+          block.appendChild(nameP);
+
+          const descP = document.createElement('p');
+          descP.textContent = desc;
+          descP.style.fontSize = '13px';
+          descP.style.color = '#64748b';
+          descP.style.margin = '2px 0 0';
+          block.appendChild(descP);
+
+          const urlP = document.createElement('p');
+          urlP.style.margin = '2px 0 0';
           const a = document.createElement('a');
           a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
-          a.className = 'advisor-link'; a.textContent = url;
-          linkP.appendChild(a);
-          bt2.appendChild(linkP);
+          a.textContent = url;
+          a.style.fontSize = '13px';
+          a.style.color = '#1e827d';
+          a.style.textDecoration = 'underline';
+          a.style.wordBreak = 'break-all';
+          urlP.appendChild(a);
+          block.appendChild(urlP);
+
+          bt2.appendChild(block);
         });
 
         bt2.classList.remove('streaming');
@@ -2436,9 +2458,8 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
         msgRow2.querySelector('.bubble')?.classList.remove('streaming-bubble');
         chatArea.appendChild(wrap2);
         scrollBottom();
-        // done() is intentionally deferred — called after bubble 3 appears
 
-        // Bubble 3 — follow-up with context-aware quick replies
+        // Bubble 3 — closing question (800 ms delay + typing indicator)
         setTimeout(() => {
           showTyping();
           setTimeout(() => {
@@ -2447,7 +2468,7 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
             bt3.innerHTML = '';
 
             const intro3 = document.createElement('p');
-            intro3.textContent = 'Is there anything else I can help with? You can ask about SNAP rules, or connect with a UT Outpost advisor for a more detailed conversation.';
+            intro3.textContent = 'Is there anything else I can help with?';
             bt3.appendChild(intro3);
 
             bt3.classList.remove('streaming');
@@ -2455,31 +2476,15 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
             msgRow3.querySelector('.bubble')?.classList.remove('streaming-bubble');
             chatArea.appendChild(wrap3);
 
-            // ── Quick reply options ──────────────────────────────────────────
-            const contextQ =
-              snapData.path === 'BLOCKED_MEAL_PLAN'  ? 'What if I drop my meal plan?' :
-              snapData.path === 'BLOCKED_WORK_RULES' ? 'Can I qualify if my situation changes?' :
-              snapData.path === 'BLOCKED_INCOME'     ? 'What counts as income for SNAP?' :
-                                                       'How could I qualify in the future?';
-
+            // ── 3 fixed quick replies ────────────────────────────────────────
             const qrWrap3 = document.createElement('div');
             qrWrap3.className = 'quick-replies';
 
-            // Option 1 — context-aware question → sends to Claude
+            // Option 1 — UT Outpost advisor (hardcoded inline bubble)
             const btn1 = document.createElement('button');
             btn1.className = 'qr-btn';
-            btn1.textContent = contextQ;
+            btn1.textContent = "I\u2019d like to speak with a UT Outpost advisor";
             btn1.addEventListener('click', () => {
-              qrWrap3.querySelectorAll('.qr-btn').forEach(b => b.disabled = true);
-              handleUserMessage(contextQ);
-            });
-            qrWrap3.appendChild(btn1);
-
-            // Option 2 — UT Outpost advisor bubble (hardcoded)
-            const btn2 = document.createElement('button');
-            btn2.className = 'qr-btn';
-            btn2.textContent = "I\u2019d like to speak with a UT Outpost advisor";
-            btn2.addEventListener('click', () => {
               qrWrap3.querySelectorAll('.qr-btn').forEach(b => b.disabled = true);
               showTyping();
               setTimeout(() => {
@@ -2488,7 +2493,7 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
                 btA.innerHTML = '';
 
                 const introA = document.createElement('p');
-                introA.textContent = "That's a great choice! The UT Outpost advisors are really knowledgeable and can walk you through everything in person. They'll be able to answer your questions and help you fill out the paperwork if needed.";
+                introA.textContent = "That\u2019s a great choice! The UT Outpost advisors are really knowledgeable and can walk you through everything in person. They\u2019ll be able to answer your questions and help you fill out the paperwork if needed.";
                 btA.appendChild(introA);
 
                 const detA = document.createElement('p');
@@ -2520,27 +2525,34 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
                 mrA.querySelector('.bubble')?.classList.remove('streaming-bubble');
                 chatArea.appendChild(wA);
 
-                // Advisor action links
                 const qrA = document.createElement('div');
                 qrA.className = 'quick-replies';
-                [
-                  { label: 'Book SNAP advising session', href: 'https://bookings.cloud.microsoft/book/SNAPBenefitsAdvising@utexas.onmicrosoft.com/?ismsaljsauthenabled', tel: false },
-                ].forEach(({ label, href, tel }) => {
-                  const aEl = document.createElement('a');
-                  aEl.className = 'qr-btn'; aEl.textContent = label; aEl.href = href;
-                  if (!tel) { aEl.target = '_blank'; aEl.rel = 'noopener noreferrer'; }
-                  qrA.appendChild(aEl);
-                });
+                const aEl = document.createElement('a');
+                aEl.className = 'qr-btn';
+                aEl.textContent = 'Book SNAP advising session';
+                aEl.href = 'https://bookings.cloud.microsoft/book/SNAPBenefitsAdvising@utexas.onmicrosoft.com/?ismsaljsauthenabled';
+                aEl.target = '_blank'; aEl.rel = 'noopener noreferrer';
+                qrA.appendChild(aEl);
                 wA.appendChild(qrA);
                 scrollBottom();
               }, 600);
             });
+            qrWrap3.appendChild(btn1);
+
+            // Option 2 — "How could I qualify in the future?" → Claude
+            const btn2 = document.createElement('button');
+            btn2.className = 'qr-btn';
+            btn2.textContent = 'How could I qualify in the future?';
+            btn2.addEventListener('click', () => {
+              qrWrap3.querySelectorAll('.qr-btn').forEach(b => b.disabled = true);
+              handleUserMessage('How could I qualify in the future?');
+            });
             qrWrap3.appendChild(btn2);
 
-            // Option 3 — Done
+            // Option 3 — "Thanks, I understand." → single closing bubble
             const btn3 = document.createElement('button');
             btn3.className = 'qr-btn';
-            btn3.textContent = "No thanks, I\u2019m done.";
+            btn3.textContent = 'Thanks, I understand.';
             btn3.addEventListener('click', () => {
               qrWrap3.querySelectorAll('.qr-btn').forEach(b => b.disabled = true);
               showTyping();
@@ -2549,7 +2561,7 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
                 const { wrap: wD, msgRow: mrD, bubbleText: btD } = createBotBubble();
                 btD.innerHTML = '';
                 const pD = document.createElement('p');
-                pD.textContent = 'No problem. You can always come back and check again if your situation changes. Good luck!';
+                pD.textContent = "You\u2019re welcome. You can always come back if your situation changes. Good luck!";
                 btD.appendChild(pD);
                 btD.classList.remove('streaming');
                 btD.removeAttribute('aria-label');
