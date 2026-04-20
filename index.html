@@ -1606,6 +1606,10 @@ function resetSnapData() {
   snapData = { householdLabel: null, incomeLimit: null, exemption: null, monthlyBenefit: null, eligibilityStatus: null, email: null, path: null };
 }
 
+// ── Language preference ────────────────────────────────────────────────────────
+let firstMessageSent  = false;   // true after language detection has run once
+let preferredLanguage = null;    // e.g. "Spanish", "Chinese" — null means English
+
 // ── DOM refs ───────────────────────────────────────────────────────────────────
 const chatArea    = document.getElementById('chatArea');
 const msgInput    = document.getElementById('msgInput');
@@ -2597,7 +2601,7 @@ async function callAPI(retryCount = 0) {
       method: 'POST',
       signal: abortCtrl.signal,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ system: SYSTEM_PROMPT, messages: history }),
+      body: JSON.stringify({ system: getSystemPrompt(), messages: history }),
     });
 
     if (!response.ok) {
@@ -2751,6 +2755,98 @@ function trimHistory(maxMessages = 50) {
   }
 }
 
+// ── Language detection helpers ─────────────────────────────────────────────────
+
+// Calls the API with a tiny prompt to identify the language of `text`.
+// Returns an English language name (e.g. "Spanish"), or "English" on failure.
+async function detectLanguage(text) {
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system: 'You are a language detector. Reply with ONLY the language name in English — one or two words, nothing else.',
+        messages: [{ role: 'user', content: `What language is this text written in? Reply with ONLY the language name in English, nothing else.\nText: "${text}"` }],
+      }),
+    });
+    if (!res.ok) return 'English';
+
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    let detected = '';
+
+    outer: while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const events = buf.split('\n\n');
+      buf = events.pop(); // may be incomplete
+      for (const event of events) {
+        const dataLine = event.split('\n').find(l => l.startsWith('data: '));
+        if (!dataLine) continue;
+        try {
+          const d = JSON.parse(dataLine.slice(6));
+          if (d.type === 'content_block_delta' && d.delta?.type === 'text_delta') {
+            detected += d.delta.text;
+          }
+          if (d.type === 'message_stop') break outer;
+        } catch { /* non-JSON SSE line, skip */ }
+      }
+    }
+
+    return detected.trim().replace(/[.,!?]+$/, '') || 'English';
+  } catch {
+    return 'English'; // network error or parse error — default to English
+  }
+}
+
+// Returns the system prompt with an optional language instruction appended.
+function getSystemPrompt() {
+  if (!preferredLanguage) return SYSTEM_PROMPT;
+  return SYSTEM_PROMPT + `\n\nLANGUAGE INSTRUCTION: Always respond in ${preferredLanguage}. Translate all explanations naturally. Keep proper nouns in English: SNAP, Texas HHS, UT Outpost, YourTexasBenefits.com, USDA.`;
+}
+
+// Shows a "reply in [Language]?" bubble with two quick-reply buttons.
+// After the user chooses, pushes originalText to history and calls the API.
+function showLanguagePrompt(lang, originalText) {
+  const { wrap, msgRow, bubbleText } = createBotBubble();
+  bubbleText.classList.remove('streaming');
+  bubbleText.removeAttribute('aria-label');
+  msgRow.querySelector('.bubble')?.classList.remove('streaming-bubble');
+
+  const p = document.createElement('p');
+  p.textContent = `It looks like you're writing in ${lang}. Would you like me to respond in ${lang}?`;
+  bubbleText.appendChild(p);
+
+  chatArea.appendChild(wrap);
+
+  const qrWrap = document.createElement('div');
+  qrWrap.className = 'quick-replies';
+
+  [
+    { label: `Yes, respond in ${lang}`, useLanguage: true },
+    { label: 'No, use English',         useLanguage: false },
+  ].forEach(({ label, useLanguage }) => {
+    const btn = document.createElement('button');
+    btn.className = 'qr-btn';
+    btn.textContent = label;
+    btn.addEventListener('click', async () => {
+      qrWrap.querySelectorAll('.qr-btn').forEach(b => b.disabled = true);
+      addMessage('user', label);
+      if (useLanguage) preferredLanguage = lang;
+      // Now process the original message with the updated language preference
+      history.push({ role: 'user', content: originalText });
+      trimHistory();
+      await callAPI();
+    });
+    qrWrap.appendChild(btn);
+  });
+
+  wrap.appendChild(qrWrap);
+  scrollBottom();
+}
+
 async function handleUserMessage(text) {
   if (loading) return;
 
@@ -2812,6 +2908,20 @@ async function handleUserMessage(text) {
       scrollBottom();
     }, 800);
     return;
+  }
+
+  // ── Language detection (first message only) ───────────────────────────────
+  // Run before pushing to history so we can defer the API call until the
+  // user has chosen their language preference.
+  if (!firstMessageSent) {
+    firstMessageSent = true;
+    const lang = await detectLanguage(text);
+    if (lang && lang.toLowerCase() !== 'english') {
+      // showLanguagePrompt handles the history push + callAPI after the choice
+      showLanguagePrompt(lang, text);
+      return;
+    }
+    // English (or detection failed) — fall through to normal processing
   }
 
   if (pendingFile) {
