@@ -3264,8 +3264,13 @@ function renderEmailInput() {
   bubbleText.removeAttribute('aria-label');
   msgRow.querySelector('.bubble')?.classList.remove('streaming-bubble');
 
+  // Dim the main chat input while email entry is active
+  const inputArea = document.querySelector('.input-area');
+  inputArea.style.opacity = '0.5';
+  inputArea.style.pointerEvents = 'none';
+
   const p = document.createElement('p');
-  p.textContent = 'What\'s your email address?';
+  p.textContent = "What's your email address?";
   bubbleText.appendChild(p);
 
   const row = document.createElement('div');
@@ -3274,32 +3279,60 @@ function renderEmailInput() {
   const input = document.createElement('input');
   input.type = 'email';
   input.placeholder = 'your@email.com';
-  input.style.cssText = 'flex:1;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:14px;font-family:inherit;outline:none;color:#1e293b';
+  input.style.cssText = 'flex:1;height:40px;border:1px solid #e2e8f0;border-radius:8px;padding:0 12px;font-size:14px;font-family:inherit;color:#1e293b;background:#fff;outline:none;box-sizing:border-box';
+  input.addEventListener('focus', () => { input.style.borderColor = '#065C58'; });
+  input.addEventListener('blur',  () => { if (input.style.borderColor !== '#e24b4a') input.style.borderColor = '#e2e8f0'; });
 
   const submitBtn = document.createElement('button');
   submitBtn.textContent = 'Send';
-  submitBtn.style.cssText = 'background:#1e827d;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit';
+  submitBtn.style.cssText = 'height:40px;padding:0 16px;background:#065C58;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;flex-shrink:0;font-family:inherit;white-space:nowrap';
 
-  const onSubmit = () => {
+  const errorMsg = document.createElement('div');
+  errorMsg.style.cssText = 'font-size:12px;color:#e24b4a;margin-top:4px;display:none';
+  errorMsg.textContent = 'Please enter a valid email address';
+
+  const onSubmit = async () => {
     const email = input.value.trim();
-    if (!email || !email.includes('@')) {
-      input.style.borderColor = '#ef4444';
+    const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (!isValid) {
+      input.style.borderColor = '#e24b4a';
+      errorMsg.style.display = 'block';
       return;
     }
-    snapData.email = email;
+
+    // Lock the email input row and show sending state
     input.disabled = true;
     submitBtn.disabled = true;
-    submitBtn.style.opacity = '0.5';
-    renderEmailConfirmation(email);
+    submitBtn.textContent = 'Sending...';
+    submitBtn.style.opacity = '0.7';
+    errorMsg.style.display = 'none';
+
+    // Show the email address as a user bubble
+    snapData.email = email;
+    addMessage('user', email);
+
+    // Call the API, then show the result bubble
+    let success = false;
+    try {
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, summary: buildEmailSummary() }),
+      });
+      success = res.ok;
+    } catch { /* network error — success stays false */ }
+
+    showEmailResult(success, email, inputArea);
   };
 
   submitBtn.addEventListener('click', onSubmit);
   input.addEventListener('keydown', e => { if (e.key === 'Enter') onSubmit(); });
-  input.addEventListener('input', () => { input.style.borderColor = '#e2e8f0'; });
+  input.addEventListener('input',   () => { input.style.borderColor = '#e2e8f0'; errorMsg.style.display = 'none'; });
 
   row.appendChild(input);
   row.appendChild(submitBtn);
   bubbleText.appendChild(row);
+  bubbleText.appendChild(errorMsg);
 
   chatArea.appendChild(wrap);
   scrollBottom();
@@ -3316,56 +3349,23 @@ function buildEmailSummary() {
   };
 }
 
-async function renderEmailConfirmation(email) {
+function showEmailResult(success, email, inputArea) {
+  // Re-enable the main chat input
+  inputArea.style.opacity = '';
+  inputArea.style.pointerEvents = '';
+
   const { wrap, msgRow, bubbleText } = createBotBubble();
   bubbleText.classList.remove('streaming');
   bubbleText.removeAttribute('aria-label');
   msgRow.querySelector('.bubble')?.classList.remove('streaming-bubble');
 
-  // Show sending state immediately
-  const statusP = document.createElement('p');
-  statusP.textContent = 'Sending your summary…';
-  statusP.style.color = '#64748b';
-  bubbleText.appendChild(statusP);
+  const p = document.createElement('p');
+  p.textContent = success
+    ? `Got it! We've sent your summary to ${email}. You can apply anytime at YourTexasBenefits.com.`
+    : 'Something went wrong. You can apply directly at YourTexasBenefits.com.';
+  bubbleText.appendChild(p);
+
   chatArea.appendChild(wrap);
-  scrollBottom();
-
-  try {
-    const res = await fetch('/api/send-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, summary: buildEmailSummary() }),
-    });
-
-    bubbleText.innerHTML = '';
-    if (res.ok) {
-      const p1 = document.createElement('p');
-      p1.textContent = 'Got it! We\'ve saved your summary for reference.';
-      const p2 = document.createElement('p');
-      p2.style.marginTop = '0.5em';
-      p2.textContent = 'You can apply anytime at YourTexasBenefits.com.';
-      bubbleText.appendChild(p1);
-      bubbleText.appendChild(p2);
-    } else {
-      const p1 = document.createElement('p');
-      p1.textContent = 'Sorry, we couldn\'t send the email right now.';
-      const p2 = document.createElement('p');
-      p2.style.marginTop = '0.5em';
-      p2.textContent = 'You can apply anytime at YourTexasBenefits.com — your situation hasn\'t changed.';
-      bubbleText.appendChild(p1);
-      bubbleText.appendChild(p2);
-    }
-  } catch {
-    bubbleText.innerHTML = '';
-    const p1 = document.createElement('p');
-    p1.textContent = 'Sorry, we couldn\'t send the email right now.';
-    const p2 = document.createElement('p');
-    p2.style.marginTop = '0.5em';
-    p2.textContent = 'You can apply anytime at YourTexasBenefits.com — your situation hasn\'t changed.';
-    bubbleText.appendChild(p1);
-    bubbleText.appendChild(p2);
-  }
-
   scrollBottom();
 }
 
