@@ -1145,10 +1145,27 @@ TEXAS-SPECIFIC (Source: Texas HHSC):
 - Applications processed within 30 days
 - Expedited SNAP within 7 days if monthly income under $150 and liquid resources under $100
 
-STUDENT RULES (Source: USDA FNS):
+STUDENT RULES (Source: USDA FNS — https://www.fns.usda.gov/snap/students):
 - Students enrolled half-time or more in higher education are generally ineligible
-- Exemptions: working 20+ hrs/week, work-study offered, dependent child, disability, TANF
+- Exemptions: working 20+ hrs/week, approved work-study, dependent child, disability, TANF
 - Continuing education, ESL, and workforce training are NOT subject to student rules
+
+WORK-STUDY EXEMPTION — ACCURATE DEFINITION:
+The work-study exemption requires ALL THREE of the following:
+1. The student is approved for work-study at the time of applying for SNAP (not just that the school offers it)
+2. The work-study is approved for the current school term
+3. The student anticipates actually working during that time
+
+IMPORTANT DISTINCTION:
+- "My school offers work-study" alone does NOT qualify
+- "I received a work-study offer in my financial aid letter" and you plan to actually work = DOES qualify
+- If a student refuses a work-study assignment, they lose the exemption
+
+COMMON CONFUSION — COVID RULE:
+During COVID (2021–July 2023), students only needed to be ELIGIBLE for work-study, not actually participating. This temporary rule has expired. As of July 1, 2023, students must actually be participating (approved + anticipating work).
+
+When a user says "my school offers work-study" or "I'm eligible for work-study", respond:
+"Work-study eligibility alone isn't enough under current rules. You need to be approved for a specific work-study position and plan to actually work. Have you been assigned a work-study job or accepted a specific position?"
 
 UT AUSTIN RESOURCES:
 - UT Outpost: https://deanofstudents.utexas.edu/emergency/utoutpost.php
@@ -1324,7 +1341,10 @@ OPTIONS:["More than 10 meals a week (most meals covered)","10 meals or fewer a w
 Step 4 \u2014 Exemption check:
 OPTIONS:["I work 20+ hours per week","My school offers work-study","I have a dependent child","I have a documented disability","I receive TANF","None of these apply"]
 - None \u2192 Explain meal plan blocks eligibility. Suggest UT Outpost, Central Texas Food Bank, Student Emergency Services. End warmly. STOP.
-- Any other \u2192 "That exemption qualifies you to move forward." \u2192 Set path = STUDENT_EXEMPT \u2192 go to PHASE 2
+- "My school offers work-study" \u2192 Do NOT immediately grant the exemption. Clarify: "Work-study eligibility alone isn't enough under current rules \u2014 as of July 2023, you need to be approved for a specific position and plan to actually work. Have you been assigned a work-study job or accepted a specific position?" OPTIONS:["Yes, I have an approved work-study position","No, I just know the school offers it"]
+  - Yes, approved position \u2192 "That qualifies you for the work-study exemption." \u2192 Set path = STUDENT_EXEMPT \u2192 go to PHASE 2
+  - No, just eligible \u2192 Explain the exemption doesn't apply under current rules. Suggest UT Outpost, Central Texas Food Bank, Student Emergency Services. End warmly. STOP.
+- Any other exemption \u2192 "That exemption qualifies you to move forward." \u2192 Set path = STUDENT_EXEMPT \u2192 go to PHASE 2
 
 MEAL PLAN CLARIFICATION — Official USDA Policy
 (Source: USDA FNS — https://www.fns.usda.gov/snap/clarification-meal-plans-institutions-higher-education)
