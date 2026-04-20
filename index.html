@@ -1313,6 +1313,9 @@ Texas-specific rules
 - Texas HHS SNAP: https://www.hhs.texas.gov/services/food/snap-food-benefits
 - Your Texas Benefits: https://www.yourtexasbenefits.com/
 
+Meal plan rules
+- USDA FNS Meal Plans: https://www.fns.usda.gov/snap/clarification-meal-plans-institutions-higher-education
+
 Work requirements
 - USDA FNS ABAWD: https://www.fns.usda.gov/snap/ABAWD
 
@@ -1467,7 +1470,7 @@ OPTIONS:["Yes, I have a school meal plan","No meal plan"]
 Step 3b \u2014 Meal plan level check:
 Ask: "Got it. Just to clarify \u2014 how many meals a week does your plan actually cover? A full week has 21 meals (3 meals \u00d7 7 days). If your plan covers more than half of those, it affects your SNAP eligibility."
 OPTIONS:["More than 10 meals a week (most meals covered)","10 meals or fewer a week (only some meals)","I\u2019m not sure how to count mine"]
-- More than 10 meals \u2192 Use INELIGIBLE_SPLIT format. Bubble 1: Explain the student meal plan rule \u2014 covering more than 50% of weekly meals (>10 of 21) makes a student ineligible for SNAP. Be empathetic. Bubble 2 is hardcoded by frontend. STOP.
+- More than 10 meals \u2192 Use INELIGIBLE_SPLIT format. Bubble 1: Explain the student meal plan rule \u2014 covering more than 50% of weekly meals (>10 of 21) makes a student ineligible for SNAP. Be empathetic. End with: [USDA FNS Meal Plans](https://www.fns.usda.gov/snap/clarification-meal-plans-institutions-higher-education). Bubble 2 is hardcoded by frontend. STOP.
 - 10 or fewer meals \u2192 "Good news \u2014 your meal plan only covers part of the week, so it doesn\u2019t block your eligibility. Let\u2019s keep going." \u2192 go to Step 4
 - Not sure \u2192 Explain: "Count each scheduled meal your plan provides per week \u2014 breakfast, lunch, and dinner each count as 1. If your plan covers 5 weekday lunches, that\u2019s 5 meals. If it covers breakfast and lunch on weekdays, that\u2019s 10 meals." Then re-ask with OPTIONS:["More than 10 meals a week (most meals covered)","10 meals or fewer a week (only some meals)"]
 
