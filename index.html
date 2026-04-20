@@ -1339,9 +1339,9 @@ OPTIONS:["More than 10 meals a week (most meals covered)","10 meals or fewer a w
 - Not sure \u2192 Explain: "Count each scheduled meal your plan provides per week \u2014 breakfast, lunch, and dinner each count as 1. If your plan covers 5 weekday lunches, that\u2019s 5 meals. If it covers breakfast and lunch on weekdays, that\u2019s 10 meals." Then re-ask with OPTIONS:["More than 10 meals a week (most meals covered)","10 meals or fewer a week (only some meals)"]
 
 Step 4 \u2014 Exemption check:
-OPTIONS:["I work 20+ hours per week","My school offers work-study","I have a dependent child","I have a documented disability","I receive TANF","None of these apply"]
+OPTIONS:["I work 20+ hours per week","I have an approved work-study position","I have a dependent child","I have a documented disability","I receive TANF","None of these apply"]
 - None \u2192 Explain meal plan blocks eligibility. Suggest UT Outpost, Central Texas Food Bank, Student Emergency Services. End warmly. STOP.
-- "My school offers work-study" \u2192 Do NOT immediately grant the exemption. Clarify: "Work-study eligibility alone isn't enough under current rules \u2014 as of July 2023, you need to be approved for a specific position and plan to actually work. Have you been assigned a work-study job or accepted a specific position?" OPTIONS:["Yes, I have an approved work-study position","No, I just know the school offers it"]
+- "I have an approved work-study position" \u2192 Do NOT immediately grant the exemption. Clarify: "Work-study eligibility alone isn't enough under current rules \u2014 as of July 2023, you need to be approved for a specific position and plan to actually work. Have you been assigned a work-study job or accepted a specific position?" OPTIONS:["Yes, I have an approved work-study position","No, I just know the school offers it"]
   - Yes, approved position \u2192 "That qualifies you for the work-study exemption." \u2192 Set path = STUDENT_EXEMPT \u2192 go to PHASE 2
   - No, just eligible \u2192 Explain the exemption doesn't apply under current rules. Suggest UT Outpost, Central Texas Food Bank, Student Emergency Services. End warmly. STOP.
 - Any other exemption \u2192 "That exemption qualifies you to move forward." \u2192 Set path = STUDENT_EXEMPT \u2192 go to PHASE 2
