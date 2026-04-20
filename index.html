@@ -657,28 +657,40 @@
       background: rgba(0,0,0,0.5);
       z-index: 100;
       opacity: 0;
-      transition: opacity 0.25s ease;
+      transition: opacity 0.25s;
     }
     .sheet-overlay.open { opacity: 1; }
 
     /* ─── Bottom Sheet ─────────────────────────────────── */
+    /* Desktop: center on chatbot container (max 480px), not full viewport */
     .sheet {
       position: fixed;
       bottom: 0;
       left: 50%;
       transform: translateX(-50%) translateY(100%);
-      width: 100%;
+      width: min(100vw, 480px);
       max-width: 480px;
       max-height: 70vh;
-      background: #ffffff;
+      background: white;
       border-radius: 16px 16px 0 0;
       z-index: 101;
       display: flex;
       flex-direction: column;
       box-shadow: 0 -4px 32px rgba(0,0,0,0.12);
-      transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+      transition: transform 0.3s ease;
     }
     .sheet.open { transform: translateX(-50%) translateY(0); }
+
+    /* Mobile: full-width, no translateX centering trick */
+    @media (max-width: 767px) {
+      .sheet {
+        width: 100vw;
+        left: 0;
+        transform: translateY(100%);
+        border-radius: 16px 16px 0 0;
+      }
+      .sheet.open { transform: translateY(0); }
+    }
 
     .sheet-header {
       display: flex;
