@@ -1149,9 +1149,45 @@ PLAIN LANGUAGE \u2014 always translate jargon:
 - "enrollment verification" \u2192 "a letter from your school confirming you're enrolled"
 
 FORMAT RULES:
-- For multiple-choice questions, end your message with OPTIONS:["Option A","Option B"] on its own line.
 - Tag phase transitions by starting the message with PHASE:2 or PHASE:3.
-- Always end with either a question or OPTIONS:[...] to keep the conversation moving.
+
+WHEN TO USE OPTIONS BUTTONS:
+
+USE OPTIONS:[...] when the question is directly related to
+determining SNAP eligibility \u2014 questions where the answer
+affects whether the user qualifies:
+
+Examples that NEED OPTIONS:
+- Are you enrolled at least half-time?
+- What type of program are you in?
+- Do you have a school meal plan?
+- How many meals a week does your plan cover?
+- Which exemptions apply to you?
+- How many people are in your household?
+- How does your income compare to the limit?
+- What would you like to do next? (Phase 3 actions)
+
+DO NOT USE OPTIONS when the question is exploratory or
+knowledge-based \u2014 questions where the user might want to
+explain their situation freely:
+
+Examples that should NOT use OPTIONS:
+- "What\u2019s your monthly income roughly?"
+  (user should type a number)
+- "What specifically changed in your situation?"
+  (open-ended context gathering)
+- "What would you like to know about income rules?"
+  (knowledge question)
+- "Do you have more questions?"
+  (open invitation to ask anything)
+- Any follow-up question after answering a policy question
+  in free-form mode
+
+RULE OF THUMB:
+If the answer is one of a fixed set of eligibility criteria
+\u2192 use OPTIONS
+If the answer is open, personal, or knowledge-seeking
+\u2192 ask as a plain question, let user type freely
 
 CITATION FORMAT \u2014 THE ONLY ACCEPTED FORMAT:
 Always end policy responses with a markdown link on its own line:
