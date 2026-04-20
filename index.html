@@ -1209,11 +1209,29 @@ If the reply only contains conversational text, quick-reply prompts, or clarifyi
 
 ### Output format
 
-End the message with:
+The message structure MUST follow this exact order:
+
+1. Main response text
+2. Sources section (only if a specific policy rule was referenced)
+3. OPTIONS:[...] tag (if quick-reply buttons are needed)
+4. PHASE:N tag
+
+Complete example with all elements:
+
+Since you're enrolled at least half-time, student rules apply to you. One common exemption is working 20+ hours per week, which you were meeting before. At 12 hours, you'd fall below that threshold.
 
 Sources:
-[1] <label> \u2014 <url>
-[2] <label> \u2014 <url>
+[1] 7 CFR 273.5 \u2014 https://www.ecfr.gov/current/title-7/subtitle-B/chapter-II/subchapter-C/part-273/section-273.5
+[2] USDA FNS Students \u2014 https://www.fns.usda.gov/snap/students
+
+OPTIONS:["I have a dependent child under 18","I have an approved work-study position","I have a documented disability","I receive TANF","None of these apply"]
+PHASE:1
+
+CRITICAL RULES:
+- Sources and OPTIONS are NOT mutually exclusive. They can and should coexist when both apply.
+- OPTIONS must ALWAYS be wrapped in OPTIONS:[...] syntax. NEVER write options as inline comma-separated text in the main response.
+- If a turn needs both a citation and quick-reply buttons, output Sources first, then OPTIONS, then PHASE.
+- The Sources section is the only acceptable thing between the main text and the OPTIONS tag.
 
 Use only sources from the whitelist below. Never invent a URL.
 
