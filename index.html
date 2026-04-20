@@ -1141,6 +1141,20 @@ FORMAT RULES:
 - Tag phase transitions by starting the message with PHASE:2 or PHASE:3.
 - Always end with either a question or OPTIONS:[...] to keep the conversation moving.
 
+CITATION FORMAT \u2014 THE ONLY ACCEPTED FORMAT:
+Always end policy responses with a markdown link on its own line:
+[Source Name](URL)
+
+NEVER use any of these formats:
+- Sources: [1] Name, URL
+- [1] Name
+- Source: URL
+- References: ...
+
+If you cite multiple sources, put each on its own line:
+[USDA FNS Eligibility](https://www.fns.usda.gov/snap/recipient/eligibility)
+[USDA FNS Benefits](https://www.fns.usda.gov/snap/allotment/cola)
+
 SNAP POLICY REFERENCE \u2014 FY2026 (Oct 1, 2025 \u2013 Sept 30, 2026)
 
 INCOME LIMITS (Source: USDA FNS):
@@ -1690,9 +1704,15 @@ function parseResponse(raw) {
   // Strip "What would you like to do next?" — conveyed by the buttons, not text
   text = text.replace(/\n?What would you like to do next\??/gi, '').trim();
 
+  // Strip numbered Sources block from displayed text so it never appears raw.
+  // Do this before OPTIONS parsing so the block doesn't interfere with matching.
+  text = text.replace(/\n?Sources?:\s*\n((?:\[\d+\][^\n]*\n?)*)/gi, '').trim();
+
   // OPTIONS tag — strip citation links from a scratch copy first so a trailing
   // [Text](url) citation on the same or next line doesn't break the match.
-  const textNoCitations = text.replace(/\s*\[[^\]]+\]\(https?:\/\/[^\)\s]+\)/g, '');
+  const textNoCitations = text
+    .replace(/\s*\[[^\]]+\]\(https?:\/\/[^\)\s]+\)/g, '')
+    .replace(/\n?Sources?:\s*\n((?:\[\d+\][^\n]*\n?)*)/gi, '');
   const optM = textNoCitations.match(/OPTIONS:\[(.+?)\]\s*$/m);
   if (optM) {
     try {
@@ -1883,19 +1903,34 @@ function extractContext(raw, url) {
 function parseCitations(raw) {
   const sources = [];
   const seen = new Set();
-  const re = /\[([^\]]+)\]\((https?:\/\/[^\)\s]+)\)/g;
+
+  // Primary format: [Label](URL)
+  const mdRe = /\[([^\]]+)\]\((https?:\/\/[^\)\s]+)\)/g;
   let m;
-  while ((m = re.exec(raw)) !== null) {
+  while ((m = mdRe.exec(raw)) !== null) {
     const [, title, url] = m;
     if (seen.has(url)) continue;
     seen.add(url);
     sources.push({ url, title: title.trim(), domain: extractDomain(url), context: extractContext(raw, url) });
   }
+
+  // Fallback format: Sources:\n[N] Label — URL  (em dash or regular dash)
+  const numberedRe = /^\[\d+\]\s+([^\n—\-]+?)\s*[—\-–]\s*(https?:\/\/\S+)/gm;
+  while ((m = numberedRe.exec(raw)) !== null) {
+    const title = m[1].trim();
+    const url   = m[2].replace(/[)>\s]+$/, ''); // strip trailing punctuation
+    if (seen.has(url)) continue;
+    seen.add(url);
+    sources.push({ url, title, domain: extractDomain(url), context: '' });
+  }
+
   return sources;
 }
 
 function hasCitations(raw) {
-  return /According to/i.test(raw) || /\[[^\]]+\]\(https?:\/\/[^\)\s]+\)/.test(raw);
+  return /According to/i.test(raw) ||
+    /\[[^\]]+\]\(https?:\/\/[^\)\s]+\)/.test(raw) ||
+    /^Sources?:/im.test(raw);
 }
 
 function buildSourcesChip(sources) {
@@ -2101,7 +2136,9 @@ const STREAMING_TAG_NAMES = [
 function stripStreamingTags(text) {
   // Strip complete known tags
   text = text.replace(/PHASE:\d[^\S\n]*\n?/g, '');         // PHASE:N
-  text = text.replace(/OPTIONS:\[[^\]]*\]/g, '');           // OPTIONS:[...]
+  text = text.replace(/OPTIONS:\[[^\]]*\]/g, '');           // OPTIONS:[...] complete
+  // If OPTIONS:[ arrived but the closing ] hasn't yet, strip from that point
+  if (text.includes('OPTIONS:[')) text = text.slice(0, text.indexOf('OPTIONS:['));
   text = text.replace(/AMOUNT:\$[\d,]+/g, '');              // AMOUNT:$NNN
   text = text.replace(/LIST:[\s\S]*?END_LIST/g, '');        // LIST:...END_LIST
   text = text.replace(/HIGHLIGHT:\$[\d,]+/g, '');           // HIGHLIGHT:$NNN
@@ -2111,6 +2148,11 @@ function stripStreamingTags(text) {
   if (text.includes('BLIST:')) text = text.slice(0, text.indexOf('BLIST:')); // partial BLIST
   text = text.replace(/SECTION:[^\n]*\n?/g, '');            // SECTION:Title
   text = text.replace(/END_SECTION[^\S\n]*\n?/g, '');       // END_SECTION
+  // Strip complete Sources block (numbered or markdown format)
+  text = text.replace(/\n?Sources?:\s*\n((?:\[\d+\][^\n]*\n?)*)/gi, '');
+  // If Sources: arrived but entries haven't yet, strip from that point
+  const srcIdx = text.search(/\nSources?:/i);
+  if (srcIdx !== -1) text = text.slice(0, srcIdx);
 
   // Trim trailing partial tag prefix (tag split across streaming chunks).
   // Walk from longest possible prefix down to 1 char; if the tail of `text`
