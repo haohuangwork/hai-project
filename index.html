@@ -447,8 +447,22 @@
     }
 
     /* ── Eligibility amount display ───────────────────── */
-    .advisor-link { color: #1e827d; text-decoration: none; }
+    .advisor-link { color: #1e827d; text-decoration: underline; }
     .advisor-link:hover { text-decoration: underline; }
+    .advisor-details {
+      list-style: disc;
+      margin: 0;
+      padding-left: 21px;
+      font-size: 14px;
+      color: #1e293b;
+      line-height: 1.4;
+    }
+    .advisor-details li { margin: 0; }
+    .advisor-details li + li { margin-top: 4px; }
+    .advisor-details-label {
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
     .apply-checklist {
       margin: 0.5em 0 0 1.2em;
       font-size: 14px;
@@ -1479,13 +1493,12 @@ Do NOT output OPTIONS after INELIGIBLE_SPLIT. Stop after the token.
 When user selects "I have more questions to ask UT Outpost advisor" \u2192 Output this EXACT format, no deviations:
 
 ADVISOR:1
-Got it. UT Outpost advisors can walk you through the full application in person.
+That's a great choice! The UT Outpost advisors are really knowledgeable and can walk you through everything in person. They'll be able to answer your questions and help you fill out the paperwork if needed.
 
 UT Outpost Details:
 - Location: Student Services Building (SSB), Ground Floor
-- Website: https://deanofstudents.utexas.edu/emergency/utoutpost.php
+- https://deanofstudents.utexas.edu/emergency/utoutpost.php
 
-To schedule an appointment, you can:
 OPTIONS:["Book SNAP advising session"]
 
 - "I'll apply later" \u2192 The frontend handles this directly with a summary card. Do NOT generate a response for this option.
@@ -1712,7 +1725,7 @@ function attachOptions(wrap, options, phase, advisor = false) {
   if (advisor) {
     // Advisor-specific buttons — rendered as links, not chat messages
     const advisorActions = [
-      { text: 'Book SNAP advising session', href: 'https://outlook.office.com/book/SNAPBenefitsAdvising@utexas.onmicrosoft.com/', tel: false },
+      { text: 'Book SNAP advising session', href: 'https://bookings.cloud.microsoft/book/SNAPBenefitsAdvising@utexas.onmicrosoft.com/?ismsaljsauthenabled', tel: false },
     ];
     advisorActions.forEach(action => {
       const a = document.createElement('a');
@@ -2066,6 +2079,7 @@ const isDefinedBubble = (raw) =>
   raw.includes('AMOUNT:$') ||
   raw.includes('LIST:') ||
   raw.includes('BLIST:') ||
+  raw.includes('ADVISOR:1') ||
   raw.includes('UT Outpost Details') ||
   raw.includes('SNAP Eligibility Summary');
 
@@ -2155,45 +2169,35 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
 
     // Intro paragraph
     const intro = document.createElement('p');
-    intro.textContent = 'Got it. UT Outpost advisors can walk you through the full application in person.';
+    intro.textContent = "That's a great choice! The UT Outpost advisors are really knowledgeable and can walk you through everything in person. They'll be able to answer your questions and help you fill out the paperwork if needed.";
     bubbleText.appendChild(intro);
 
     // "UT Outpost Details:" label
     const detailsLabel = document.createElement('p');
+    detailsLabel.className = 'advisor-details-label';
     detailsLabel.style.marginTop = '8px';
-    detailsLabel.style.fontWeight = '600';
     detailsLabel.textContent = 'UT Outpost Details:';
     bubbleText.appendChild(detailsLabel);
 
-    // Location — Google Maps link
-    const locP = document.createElement('p');
-    locP.style.marginTop = '4px';
-    const locA = document.createElement('a');
-    locA.href = 'https://maps.google.com/?q=Student+Services+Building+UT+Austin+Texas';
-    locA.target = '_blank';
-    locA.rel = 'noopener noreferrer';
-    locA.textContent = 'Student Services Building (SSB), Ground Floor';
-    locA.className = 'advisor-link';
-    locP.appendChild(locA);
-    bubbleText.appendChild(locP);
+    // Bullet list: Location (plain text) + clickable URL
+    const ul = document.createElement('ul');
+    ul.className = 'advisor-details';
 
-    // Website link
-    const webP = document.createElement('p');
-    webP.style.marginTop = '4px';
+    const liLoc = document.createElement('li');
+    liLoc.textContent = 'Location: Student Services Building (SSB), Ground Floor';
+    ul.appendChild(liLoc);
+
+    const liWeb = document.createElement('li');
     const webA = document.createElement('a');
     webA.href = 'https://deanofstudents.utexas.edu/emergency/utoutpost.php';
     webA.target = '_blank';
     webA.rel = 'noopener noreferrer';
-    webA.textContent = 'deanofstudents.utexas.edu/emergency/utoutpost.php';
+    webA.textContent = 'https://deanofstudents.utexas.edu/emergency/utoutpost.php';
     webA.className = 'advisor-link';
-    webP.appendChild(webA);
-    bubbleText.appendChild(webP);
+    liWeb.appendChild(webA);
+    ul.appendChild(liWeb);
 
-    // Schedule prompt
-    const schedP = document.createElement('p');
-    schedP.style.marginTop = '8px';
-    schedP.textContent = 'To schedule an appointment, you can:';
-    bubbleText.appendChild(schedP);
+    bubbleText.appendChild(ul);
 
     attachOptions(wrap, options, phase, true);
     scrollBottom();
@@ -2371,38 +2375,32 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
                 btA.innerHTML = '';
 
                 const introA = document.createElement('p');
-                introA.textContent = 'Got it. UT Outpost advisors can walk you through the full application in person.';
+                introA.textContent = "That's a great choice! The UT Outpost advisors are really knowledgeable and can walk you through everything in person. They'll be able to answer your questions and help you fill out the paperwork if needed.";
                 btA.appendChild(introA);
 
                 const detA = document.createElement('p');
-                detA.style.cssText = 'margin-top:8px;font-weight:600;';
+                detA.className = 'advisor-details-label';
+                detA.style.marginTop = '8px';
                 detA.textContent = 'UT Outpost Details:';
                 btA.appendChild(detA);
 
-                const locPA = document.createElement('p');
-                locPA.style.marginTop = '4px';
-                const locAA = document.createElement('a');
-                locAA.href = 'https://maps.google.com/?q=Student+Services+Building+UT+Austin+Texas';
-                locAA.target = '_blank'; locAA.rel = 'noopener noreferrer';
-                locAA.className = 'advisor-link';
-                locAA.textContent = 'Student Services Building (SSB), Ground Floor';
-                locPA.appendChild(locAA);
-                btA.appendChild(locPA);
+                const ulA = document.createElement('ul');
+                ulA.className = 'advisor-details';
 
-                const webPA = document.createElement('p');
-                webPA.style.marginTop = '4px';
+                const liLocA = document.createElement('li');
+                liLocA.textContent = 'Location: Student Services Building (SSB), Ground Floor';
+                ulA.appendChild(liLocA);
+
+                const liWebA = document.createElement('li');
                 const webAA = document.createElement('a');
                 webAA.href = 'https://deanofstudents.utexas.edu/emergency/utoutpost.php';
                 webAA.target = '_blank'; webAA.rel = 'noopener noreferrer';
                 webAA.className = 'advisor-link';
-                webAA.textContent = 'deanofstudents.utexas.edu/emergency/utoutpost.php';
-                webPA.appendChild(webAA);
-                btA.appendChild(webPA);
+                webAA.textContent = 'https://deanofstudents.utexas.edu/emergency/utoutpost.php';
+                liWebA.appendChild(webAA);
+                ulA.appendChild(liWebA);
 
-                const schedPA = document.createElement('p');
-                schedPA.style.marginTop = '8px';
-                schedPA.textContent = 'To schedule an appointment, you can:';
-                btA.appendChild(schedPA);
+                btA.appendChild(ulA);
 
                 btA.classList.remove('streaming');
                 btA.removeAttribute('aria-label');
@@ -2413,7 +2411,7 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
                 const qrA = document.createElement('div');
                 qrA.className = 'quick-replies';
                 [
-                  { label: 'Book SNAP advising session', href: 'https://outlook.office.com/book/SNAPBenefitsAdvising@utexas.onmicrosoft.com/', tel: false },
+                  { label: 'Book SNAP advising session', href: 'https://bookings.cloud.microsoft/book/SNAPBenefitsAdvising@utexas.onmicrosoft.com/?ismsaljsauthenabled', tel: false },
                 ].forEach(({ label, href, tel }) => {
                   const aEl = document.createElement('a');
                   aEl.className = 'qr-btn'; aEl.textContent = label; aEl.href = href;
