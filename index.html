@@ -2344,9 +2344,13 @@ function postProcessResponse(rawText) {
 
   // 2 — Enforce citation on policy responses
   const hasCitationLink = /\[[^\]]+\]\(https?:\/\/[^\)\s]+\)/.test(text);
+  // Structured flow steps with OPTIONS have explicit citation instructions in the
+  // system prompt where needed — skip the fallback so question-collection bubbles
+  // (household size, meal plan choice, etc.) don't get unwanted Sources chips.
+  const hasOptionButtons = /OPTIONS:\[/.test(text);
   let citation = null;
 
-  if (detectsPolicyContent(text) && !hasCitationLink) {
+  if (detectsPolicyContent(text) && !hasCitationLink && !hasOptionButtons) {
     citation = 'https://www.fns.usda.gov/snap/recipient/eligibility';
     const fallbackLink = '\n\n[USDA FNS SNAP](https://www.fns.usda.gov/snap/recipient/eligibility)';
     // Insert before a trailing PHASE: tag so the citation stays part of the message
