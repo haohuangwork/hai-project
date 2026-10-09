@@ -31,48 +31,101 @@
       background: #f8fafc;
       box-shadow: 0 0 48px rgba(0,0,0,0.15);
       overflow: hidden;
+      position: relative;
     }
 
-    /* ─── Header ──────────────────────────────────────── */
+    /* ─── Header (floats over chat; progressive blur) ─── */
     .header {
-      background: #ffffff;
-      padding: 16px 20px;
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      z-index: 10;
+      padding: 20px 20px 12px;
       display: flex;
       align-items: center;
       gap: 12px;
-      flex-shrink: 0;
-      border-bottom: 1px solid #f1f5f9;
+      background: linear-gradient(to bottom, #f8fafc 4.861%, rgba(248,250,252,0));
+      pointer-events: none;
     }
-    .header-icon {
+    /* Progressive blur: 6 stacked backdrop-filter layers. Each layer blurs a bit more
+       than the previous one but fades out sooner, so blur strength falls off smoothly
+       from the top edge (≈8px combined) to nothing, with no visible band edge.
+       The stack extends 16px below the header so the fade lands in the chat padding. */
+    .header-blur {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      bottom: -16px;
+      z-index: -1;
+      pointer-events: none;
+    }
+    .header-blur i {
+      position: absolute;
+      inset: 0;
+      -webkit-backdrop-filter: blur(var(--b));
+      backdrop-filter: blur(var(--b));
+      -webkit-mask-image: linear-gradient(to bottom, #000 var(--m1), transparent var(--m2));
+      mask-image: linear-gradient(to bottom, #000 var(--m1), transparent var(--m2));
+    }
+    .header-blur i:nth-child(1) { --b: 0.7px; --m1: 55%; --m2: 100%; }
+    .header-blur i:nth-child(2) { --b: 1.4px; --m1: 45%; --m2: 85%; }
+    .header-blur i:nth-child(3) { --b: 2.1px; --m1: 35%; --m2: 72%; }
+    .header-blur i:nth-child(4) { --b: 2.8px; --m1: 25%; --m2: 60%; }
+    .header-blur i:nth-child(5) { --b: 4.2px; --m1: 15%; --m2: 48%; }
+    .header-blur i:nth-child(6) { --b: 5.6px; --m1: 5%;  --m2: 36%; }
+    .header-avatar-slot {
       width: 40px;
       height: 40px;
-      border-radius: 8px;
       flex-shrink: 0;
-      display: block;
-      object-fit: cover;
     }
-    .header-text { flex: 1; }
     .header-title {
-      font-family: 'Roboto Mono', 'Courier New', monospace;
-      font-weight: 500;
+      font-weight: 600;
       font-size: 18px;
-      color: #000;
+      color: #222830;
       line-height: 1.2;
-      letter-spacing: -0.005em;
+      white-space: nowrap;
+      opacity: 0;
     }
-    .header-sub {
+    .header-title.visible { opacity: 1; }
+
+    /* ─── Launch avatar (Avatar → drops, bounces, then docks into header) ─── */
+    .launch {
+      position: absolute;
+      inset: 0;
+      z-index: 20;
+      pointer-events: none;
+    }
+    .launch.done { display: none; }
+    .launch-stack {
+      position: absolute;
+      left: 50%;
+      top: 28%;
+      width: min(287px, calc(100% - 40px));
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 11px;
+    }
+    .launch-avatar { width: 88px; height: 88px; flex-shrink: 0; transform-origin: 0 0; }
+    .launch-avatar svg { display: block; overflow: visible; width: 100%; height: 100%; }
+    .launch-avatar.docked { width: 40px; height: 40px; }
+    .launch-tagline {
       font-size: 14px;
-      font-weight: 400;
-      color: rgba(0,0,0,0.7);
-      margin-top: 2px;
+      font-weight: 500;
       line-height: 1.4;
+      color: #222830;
+      text-align: center;
+      opacity: 0;
     }
+    /* SVG parts animate around their own geometry */
+    .av-orange, .av-green, .av-bag, .av-eyes { transform-box: fill-box; }
+    .av-bag  { transform-origin: 50% 100%; }
+    .av-ball { opacity: 0; }   /* hidden until its drop starts; JS keeps final state via fill: forwards */
 
     /* ─── Chat Area ────────────────────────────────────── */
     .chat-area {
       flex: 1;
       overflow-y: auto;
-      padding: 20px;
+      padding: 92px 20px 20px;   /* top clears the floating header (72px) + 20px */
       display: flex;
       flex-direction: column;
       gap: 24px;
@@ -97,15 +150,11 @@
       width: 32px;
       height: 32px;
       border-radius: 50%;
-      background: #d6f0f1;
-      color: #1c7a74;
-      font-size: 12px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      background: #c9e3e4 url('assets/avatar-chat.svg') no-repeat 0 4px / 32px 32px;
+      font-size: 0;      /* hides the "SB" fallback text; the bag mark is the avatar */
+      color: transparent;
       flex-shrink: 0;
-      letter-spacing: -0.5px;
+      overflow: hidden;
     }
 
     /* Bot bubble */
@@ -113,16 +162,22 @@
       background: #ffffff;
       border: 1px solid #e2e8f0;
       border-radius: 16px;
-      padding: 16px;
+      padding: 12px 16px;
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 8px;
       height: auto;
       min-height: unset;
       overflow: visible;
     }
     .message.bot .bubble.streaming-bubble .msg-time { display: none; }
+
+    /* Consecutive bot messages read as one group: one avatar (first), 8px between
+       bubbles, timestamp only on the last bubble. */
+    .message.bot + .message.bot { margin-top: -16px; }            /* 24px chat gap → 8px */
+    .message.bot + .message.bot .avatar { visibility: hidden; }   /* keeps the indent */
+    .message.bot:has(+ .message.bot) .msg-time { display: none; }
     @keyframes wordFadeIn {
       from { opacity: 0; }
       to   { opacity: 1; }
@@ -132,9 +187,9 @@
     }
     .bubble-text {
       font-size: 14px;
-      font-weight: 500;
+      font-weight: 400;
       line-height: 1.4;
-      color: #1e293b;
+      color: #222830;
       word-break: break-word;
     }
     .meal-plan-hint {
@@ -162,46 +217,43 @@
       letter-spacing: -0.06px;
       white-space: nowrap;
     }
-    .check-icon { display: block; flex-shrink: 0; }
+    .check-icon { display: none; }   /* V1: no read receipts */
 
     /* User message */
     .message.user { align-items: flex-end; }
     .message.user .bubble {
-      background: #1e827d;
+      background: #107c77;
       border-radius: 16px;
       padding: 12px 16px;
       max-width: 78%;
       display: flex;
-      flex-direction: row;
-      flex-wrap: wrap;
-      align-items: flex-end;
-      column-gap: 8px;
-      row-gap: 2px;
+      flex-direction: column;   /* text, then timestamp right-aligned underneath */
+      gap: 8px;
     }
-    .message.user .bubble-text { flex: 1 1 auto; }
     .message.user .bubble-text { color: #ffffff; }
     .message.user .msg-time span { color: #aee8e6; }
 
     /* ─── Quick Replies ────────────────────────────────── */
+    /* V1: options live inside the bot bubble, under the message text */
     .quick-replies {
       display: flex;
       flex-direction: column;
       gap: 8px;
-      padding-left: 40px; /* avatar (32) + gap (8) */
       width: 100%;
-      margin-top: 8px;
+      margin-top: 8px;      /* + 8px bubble gap = 16px below the message */
     }
     .qr-btn {
       width: 100%;
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 16px;
+      background: rgba(233,240,240,0.6);   /* bg/surface-2 */
+      border: 1px solid #dae1e1;
+      border-radius: 8px;
       min-height: 44px;
-      padding: 16px;
+      padding: 12px;
       font-family: inherit;
       font-size: 14px;
-      font-weight: 600;
-      color: #1e827d;
+      font-weight: 500;
+      line-height: 1.3;
+      color: #222830;
       cursor: pointer;
       text-align: left;
       display: flex;
@@ -210,8 +262,8 @@
       text-decoration: none;
       transition: background 0.15s;
     }
-    .qr-btn:hover:not(:disabled) { background: #f0fdfa; text-decoration: none; }
-    .qr-btn:hover, .qr-btn:visited, .qr-btn:active { color: #1e827d; text-decoration: none; }
+    .qr-btn:hover:not(:disabled) { background: rgba(214,228,228,0.75); text-decoration: none; }
+    .qr-btn:hover, .qr-btn:visited, .qr-btn:active { color: #222830; text-decoration: none; }
     .qr-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
     /* ─── Typing Indicator ─────────────────────────────── */
@@ -271,7 +323,7 @@
       transition: border-color 0.2s;
     }
     .input-card:focus-within {
-      border-color: #1E827D;
+      border-color: #107c77;
     }
     .msg-input {
       width: 100%;
@@ -280,7 +332,7 @@
       font-family: inherit;
       font-size: 16px;
       font-weight: 400;
-      color: #1e293b;
+      color: #222830;
       background: transparent;
       resize: none;
       min-height: 24px;
@@ -319,7 +371,7 @@
       width: 40px;
       height: 40px;
       border-radius: 50%;
-      background: #065c58;
+      background: #014e4b;
       border: none;
       display: flex;
       align-items: center;
@@ -328,7 +380,7 @@
       flex-shrink: 0;
       transition: background 0.2s, opacity 0.2s;
     }
-    .send-btn:hover:not(:disabled) { background: #1e827d; }
+    .send-btn:hover:not(:disabled) { background: #107c77; }
     .send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
     /* Stop button shown during streaming */
@@ -447,14 +499,14 @@
     }
 
     /* ── Eligibility amount display ───────────────────── */
-    .advisor-link { color: #1e827d; text-decoration: underline; }
+    .advisor-link { color: #107c77; text-decoration: underline; }
     .advisor-link:hover { text-decoration: underline; }
     .advisor-details {
       list-style: disc;
       margin: 0;
       padding-left: 21px;
       font-size: 14px;
-      color: #1e293b;
+      color: #222830;
       line-height: 1.4;
     }
     .advisor-details li { margin: 0; }
@@ -466,13 +518,13 @@
     .apply-checklist {
       margin: 0.5em 0 0 1.2em;
       font-size: 14px;
-      color: #1e293b;
+      color: #222830;
       line-height: 1.6;
     }
     .apply-cta-btn {
       display: block;
       margin-top: 12px;
-      background: #1e827d;
+      background: #107c77;
       color: white;
       text-decoration: none;
       text-align: center;
@@ -497,7 +549,7 @@
     .blist-section-label:first-of-type { margin-top: 8px; }
     .blist-section-list {
       font-size: 14px;
-      color: #1e293b;
+      color: #222830;
       line-height: 1.6;
       padding-left: 16px;
       margin: 0 0 10px 0;
@@ -512,7 +564,7 @@
     .benefit-amount-figure {
       font-size: 20px;
       font-weight: 700;
-      color: #1e827d;
+      color: #107c77;
       line-height: 1.4;
     }
     .benefit-amount-unit {
@@ -525,7 +577,7 @@
       margin: 4px 0 0 21px;
       padding: 0;
       font-size: 14px;
-      color: #1e293b;
+      color: #222830;
       line-height: 1.4;
     }
     .benefit-list li {
@@ -548,7 +600,7 @@
       border-radius: 12px;
       padding: 4px 8px;
       font-size: 12px;
-      color: #1e293b;
+      color: #222830;
     }
     .file-preview-item img {
       width: 40px;
@@ -563,7 +615,7 @@
       width: 20px;
       height: 20px;
       border-radius: 50%;
-      background: #1e293b;
+      background: #222830;
       color: white;
       border: none;
       cursor: pointer;
@@ -579,7 +631,7 @@
       display: inline-block;
       width: 2px;
       height: 1em;
-      background: #1e827d;
+      background: #107c77;
       margin-left: 2px;
       vertical-align: text-bottom;
       animation: blink 0.7s step-end infinite;
@@ -702,7 +754,7 @@
     .sheet-title {
       font-size: 18px;
       font-weight: 500;
-      color: #1e293b;
+      color: #222830;
       line-height: 1.4;
     }
     .sheet-close {
@@ -710,7 +762,7 @@
       height: 24px;
       border: none;
       background: none;
-      color: #1e293b;
+      color: #222830;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -764,7 +816,7 @@
     .source-title {
       font-size: 16px;
       font-weight: 500;
-      color: #1e293b;
+      color: #222830;
       line-height: 1.4;
       white-space: nowrap;
       overflow: hidden;
@@ -812,7 +864,7 @@
       width: 40px;
       height: 40px;
       border-radius: 12px;
-      background: #d6f0f1;
+      background: #c9e3e4;
       color: #1c7a74;
       display: flex;
       align-items: center;
@@ -823,7 +875,7 @@
     .action-card-title {
       font-size: 14px;
       font-weight: 600;
-      color: #1e293b;
+      color: #222830;
       line-height: 1.3;
     }
     .action-card-sub {
@@ -860,8 +912,8 @@
       transition: border-color 0.15s, background 0.15s;
       width: 100%;
     }
-    .service-card:hover { border-color: #1e827d; background: #f0fdfa; }
-    .service-card.selected { border-color: #1e827d; background: #f0fdfa; }
+    .service-card:hover { border-color: #107c77; background: #f0fdfa; }
+    .service-card.selected { border-color: #107c77; background: #f0fdfa; }
     .service-card.disabled { pointer-events: none; opacity: 0.5; }
     .service-card-check {
       width: 22px;
@@ -876,11 +928,11 @@
       transition: background 0.15s, border-color 0.15s;
     }
     .service-card.selected .service-card-check {
-      background: #1e827d;
-      border-color: #1e827d;
+      background: #107c77;
+      border-color: #107c77;
     }
     .service-card-body { flex: 1; }
-    .service-card-title { font-size: 14px; font-weight: 600; color: #1e293b; line-height: 1.3; }
+    .service-card-title { font-size: 14px; font-weight: 600; color: #222830; line-height: 1.3; }
     .service-card-dur { font-size: 12px; color: #69737c; margin-top: 2px; }
 
     /* ─── Booking: Inline Input ────────────────────────── */
@@ -906,16 +958,16 @@
       border-radius: 12px;
       font-family: inherit;
       font-size: 14px;
-      color: #1e293b;
+      color: #222830;
       background: #ffffff;
       outline: none;
       transition: border-color 0.2s;
       min-width: 0;
     }
-    .booking-input:focus { border-color: #1e827d; }
+    .booking-input:focus { border-color: #107c77; }
     .booking-next-btn {
       padding: 10px 18px;
-      background: #1e827d;
+      background: #107c77;
       color: white;
       border: none;
       border-radius: 12px;
@@ -927,7 +979,7 @@
       flex-shrink: 0;
       transition: background 0.15s;
     }
-    .booking-next-btn:hover { background: #065c58; }
+    .booking-next-btn:hover { background: #014e4b; }
     .booking-next-btn:disabled { background: #94a3b8; cursor: not-allowed; }
 
     /* ─── Booking: Summary & Complete ─────────────────── */
@@ -959,7 +1011,7 @@
       min-width: 100px;
       flex-shrink: 0;
     }
-    .booking-summary-val { color: #1e293b; font-weight: 500; }
+    .booking-summary-val { color: #222830; font-weight: 500; }
     .booking-complete-btn {
       display: block;
       width: calc(100% - 40px);
@@ -998,17 +1050,14 @@
         box-shadow: none;
       }
 
-      /* Header — tighter padding, sticky */
+      /* Header — tighter horizontal padding (stays floating over chat) */
       .header {
-        padding: 12px 16px;
-        position: sticky;
-        top: 0;
-        z-index: 10;
+        padding: 20px 16px 12px;
       }
 
-      /* Chat area — tighter horizontal padding */
+      /* Chat area — tighter horizontal padding; top clears the floating header */
       .chat-area {
-        padding: 16px;
+        padding: 88px 16px 16px;
       }
 
       /* Bot bubbles — prevent overflow on narrow screens */
@@ -1024,7 +1073,6 @@
       /* Quick reply buttons — larger tap targets, bigger text */
       .qr-btn {
         min-height: 48px;
-        font-size: 15px;
       }
 
       /* Input area — safe area for iPhone home bar */
@@ -1040,12 +1088,28 @@
 
   <!-- Header -->
   <header class="header">
-    <img class="header-icon" src="avatar.svg" alt="SNAP Eligibility Assistant" aria-hidden="true">
-    <div class="header-text">
-      <div class="header-title">SNAP Eligibility Assistant</div>
-      <div class="header-sub">Quickly check if you may qualify for SNAP benefits.</div>
-    </div>
+    <div class="header-blur" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="header-avatar-slot" id="avatarSlot"></div>
+    <div class="header-title" id="headerTitle">SNAP Assistant</div>
   </header>
+
+  <!-- Launch: Avatar drops in, bounces, looks around, then docks into the header -->
+  <div class="launch" id="launch" aria-hidden="true">
+    <div class="launch-stack">
+      <div class="launch-avatar" id="launchAvatar">
+        <svg viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <g class="av-ball av-orange"><circle cx="24.2" cy="26.4" r="11" fill="#F76710"/></g>
+          <g class="av-ball av-green"><circle cx="55" cy="26.4" r="19.8" fill="#9BCF6E"/></g>
+          <g class="av-bag"><path d="M79.2 79.2H8.8L13.2 26.4H74.8L79.2 79.2Z" fill="#014E4B"/></g>
+          <g class="av-eyes">
+            <circle cx="36.3" cy="53.9" r="3.3" fill="#F0FDFA"/>
+            <circle cx="51.7" cy="53.9" r="3.3" fill="#F0FDFA"/>
+          </g>
+        </svg>
+      </div>
+      <p class="launch-tagline" id="launchTagline">Quickly check if you may qualify for SNAP benefits.</p>
+    </div>
+  </div>
 
   <!-- Chat Area (aria-live so screen readers announce new messages) -->
   <div class="chat-area" id="chatArea" role="log" aria-live="polite" aria-label="Conversation"></div>
@@ -1931,7 +1995,7 @@ function renderHighlightText(container, rawText) {
     if (m) {
       const span = document.createElement('span');
       span.textContent = m[1];
-      span.style.color = '#1e827d';
+      span.style.color = '#107c77';
       span.style.fontWeight = '600';
       container.appendChild(span);
     } else if (part) {
@@ -2532,7 +2596,7 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
           nameP.textContent = name;
           nameP.style.fontSize = '14px';
           nameP.style.fontWeight = '500';
-          nameP.style.color = '#1e293b';
+          nameP.style.color = '#222830';
           nameP.style.margin = '0';
           block.appendChild(nameP);
 
@@ -2549,7 +2613,7 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
           a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
           a.textContent = url;
           a.style.fontSize = '13px';
-          a.style.color = '#1e827d';
+          a.style.color = '#107c77';
           a.style.textDecoration = 'underline';
           a.style.wordBreak = 'break-all';
           urlP.appendChild(a);
@@ -3569,7 +3633,7 @@ function renderSummaryBubble() {
   const title = document.createElement('p');
   title.textContent = 'SNAP Eligibility Summary';
   title.style.fontWeight = '600';
-  title.style.color = '#1e293b';
+  title.style.color = '#222830';
   bubbleText.appendChild(title);
 
   // Status row
@@ -3601,7 +3665,7 @@ function renderSummaryBubble() {
     const li = document.createElement('li');
     li.textContent = item;
     li.style.fontSize = '14px';
-    li.style.color = '#1e293b';
+    li.style.color = '#222830';
     ul.appendChild(li);
   });
   bubbleText.appendChild(ul);
@@ -3654,13 +3718,13 @@ function renderEmailInput() {
   const input = document.createElement('input');
   input.type = 'email';
   input.placeholder = 'your@email.com';
-  input.style.cssText = 'flex:1;height:40px;border:1px solid #e2e8f0;border-radius:8px;padding:0 12px;font-size:14px;font-family:inherit;color:#1e293b;background:#fff;outline:none;box-sizing:border-box';
-  input.addEventListener('focus', () => { input.style.borderColor = '#065C58'; });
+  input.style.cssText = 'flex:1;height:40px;border:1px solid #e2e8f0;border-radius:8px;padding:0 12px;font-size:14px;font-family:inherit;color:#222830;background:#fff;outline:none;box-sizing:border-box';
+  input.addEventListener('focus', () => { input.style.borderColor = '#014e4b'; });
   input.addEventListener('blur',  () => { if (input.style.borderColor !== '#e24b4a') input.style.borderColor = '#e2e8f0'; });
 
   const submitBtn = document.createElement('button');
   submitBtn.textContent = 'Send';
-  submitBtn.style.cssText = 'height:40px;padding:0 16px;background:#065C58;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;flex-shrink:0;font-family:inherit;white-space:nowrap';
+  submitBtn.style.cssText = 'height:40px;padding:0 16px;background:#014e4b;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;flex-shrink:0;font-family:inherit;white-space:nowrap';
 
   const errorMsg = document.createElement('div');
   errorMsg.style.cssText = 'font-size:12px;color:#e24b4a;margin-top:4px;display:none';
@@ -3785,8 +3849,110 @@ function startChat() {
   }, 800);
 }
 
+// ── Quick replies live inside the bot bubble (V1) ───────────────────────────
+// Several flows append `.quick-replies` as a sibling of the message row. Rather than
+// patch every call site, move each one into its bubble (above the timestamp) as it is added.
+new MutationObserver(muts => {
+  for (const m of muts) for (const n of m.addedNodes) {
+    if (n.nodeType !== 1) continue;
+    const lists = n.matches?.('.quick-replies') ? [n] : [...n.querySelectorAll?.('.quick-replies') ?? []];
+    for (const qr of lists) {
+      const bubble = qr.closest('.message.bot')?.querySelector('.bubble');
+      if (!bubble || bubble.contains(qr)) continue;
+      bubble.insertBefore(qr, bubble.querySelector('.msg-time'));
+    }
+  }
+}).observe(chatArea, { childList: true, subtree: true });
+
+// ── Launch sequence ─────────────────────────────────────────────────────────
+// Orange then green produce-ball drop into the bag (bag squashes on each hit),
+// eyes glance left/right, hold, then the Avatar shrinks into the header and the
+// chat starts. Plays once per page load.
+const LAUNCH_HOLD_MS = 3000;   // pause after the eye movement, before the avatar moves up
+
+function runLaunch() {
+  const launch   = document.getElementById('launch');
+  const avatarEl = document.getElementById('launchAvatar');
+  const tagline  = document.getElementById('launchTagline');
+  const slot     = document.getElementById('avatarSlot');
+  const title    = document.getElementById('headerTitle');
+  const q = s => avatarEl.querySelector(s);
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const anim = (el, kf, opt) => el.animate(kf, { fill: 'both', ...opt }).finished;
+
+  const dock = () => {
+    avatarEl.getAnimations().forEach(a => a.cancel());   // drop the held "moved" transform before re-parenting
+    slot.appendChild(avatarEl);
+    avatarEl.style.transform = '';
+    avatarEl.classList.add('docked');
+    title.classList.add('visible');
+    launch.classList.add('done');
+  };
+
+  if (reduce) { qAll(); dock(); return Promise.resolve(); }
+  function qAll() { q('.av-orange').style.opacity = 1; q('.av-green').style.opacity = 1; }
+
+  const drop = (el, delay) => anim(el, [
+    { transform: 'translateY(-150px)', opacity: 0, offset: 0,    easing: 'cubic-bezier(.5,0,1,.6)' },
+    { transform: 'translateY(-150px)', opacity: 1, offset: 0.01, easing: 'cubic-bezier(.5,0,1,.6)' },
+    { transform: 'translateY(0)',      opacity: 1, offset: 0.58, easing: 'cubic-bezier(0,.4,.5,1)' },
+    { transform: 'translateY(-12px)',  opacity: 1, offset: 0.76, easing: 'cubic-bezier(.5,0,1,.6)' },
+    { transform: 'translateY(0)',      opacity: 1, offset: 0.88, easing: 'cubic-bezier(0,.4,.5,1)' },
+    { transform: 'translateY(-3px)',   opacity: 1, offset: 0.95 },
+    { transform: 'translateY(0)',      opacity: 1, offset: 1 }
+  ], { duration: 800, delay });
+
+  const squash = (strength, delay) => anim(q('.av-bag'), [
+    { transform: 'scale(1,1)', offset: 0 },
+    { transform: `scale(${1 + 0.04 * strength},${1 - 0.07 * strength})`, offset: 0.25, easing: 'ease-out' },
+    { transform: `scale(${1 - 0.015 * strength},${1 + 0.025 * strength})`, offset: 0.6, easing: 'ease-in-out' },
+    { transform: 'scale(1,1)', offset: 1 }
+  ], { duration: 520, delay });
+
+  const eyes = () => anim(q('.av-eyes'), [
+    { transform: 'translateX(0)',   offset: 0 },
+    { transform: 'translateX(-5px)', offset: 0.28, easing: 'ease-in-out' },
+    { transform: 'translateX(-5px)', offset: 0.4 },
+    { transform: 'translateX(5px)',  offset: 0.72, easing: 'ease-in-out' },
+    { transform: 'translateX(5px)',  offset: 0.82 },
+    { transform: 'translateX(0)',    offset: 1 }
+  ], { duration: 1200, easing: 'ease-in-out' });
+
+  const move = () => {
+    const from = avatarEl.getBoundingClientRect();
+    const to   = slot.getBoundingClientRect();
+    const dx = to.left - from.left, dy = to.top - from.top, s = to.width / from.width;
+    anim(tagline, [{ opacity: 1 }, { opacity: 0 }], { duration: 250 });
+    anim(title,   [{ opacity: 0, transform: 'translateX(-8px)' }, { opacity: 1, transform: 'translateX(0)' }],
+         { duration: 400, delay: 250, easing: 'ease-out' });
+    return anim(avatarEl, [
+      { transform: 'translate(0,0) scale(1)' },
+      { transform: `translate(${dx}px,${dy}px) scale(${s})` }
+    ], { duration: 650, easing: 'cubic-bezier(.65,0,.25,1)' });
+  };
+
+  return (async () => {
+    tagline.style.opacity = 0;
+    // orange lands at ~0.58 × 800ms ≈ 460ms after its start; green starts ~480ms later
+    drop(q('.av-orange'), 150);
+    squash(0.7, 150 + 460);
+    drop(q('.av-green'), 640);
+    squash(1, 640 + 460);
+    await wait(640 + 460 + 100);
+    anim(tagline, [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 450, easing: 'ease-out' });
+    await wait(700);
+    await eyes();
+    await wait(LAUNCH_HOLD_MS);
+    await move();
+    dock();
+    await wait(250);
+  })();
+}
+
 msgInput.disabled = false;
-startChat();
+lockInput(true);                 // keep the composer inert until the intro finishes
+runLaunch().then(startChat);
 </script>
 </body>
 </html>

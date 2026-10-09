@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "Dev Server (Node)",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["dev-server.mjs"],
+      "port": 3000
+    },
+    {
       "name": "Static File Server",
       "runtimeExecutable": "python3",
       "runtimeArgs": ["server.py"],
