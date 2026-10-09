@@ -46,7 +46,7 @@ async function proxyChat(req, res) {
       headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
+        max_tokens: 2048,
         stream: true,
         system: payload.system || '',
         messages: payload.messages || [],

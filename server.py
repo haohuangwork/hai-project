@@ -44,8 +44,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return
 
         upstream_body = json.dumps({
-            'model': 'claude-sonnet-4-20250514',
-            'max_tokens': 1000,
+            'model': 'claude-sonnet-4-6',   # keep in sync with api/chat.js and dev-server.mjs
+            'max_tokens': 2048,
             'stream': True,
             'system': payload.get('system', ''),
             'messages': payload.get('messages', []),
