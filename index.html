@@ -120,6 +120,13 @@
     .av-orange, .av-green, .av-bag, .av-eyes { transform-box: fill-box; }
     .av-bag  { transform-origin: 50% 100%; }
     .av-ball { opacity: 0; }   /* hidden until its drop starts; JS keeps final state via fill: forwards */
+    /* Layers so each motion owns its own property and never fights another:
+       .launch-avatar = x, .av-y = y, .av-scale = size, .av-float = idle bob. Scale sits
+       innermost so the y offset is not multiplied by it. */
+    .av-y, .av-scale, .av-float { width: 100%; height: 100%; }
+    .av-y { position: relative; }
+    .av-scale { position: relative; transform-origin: 0 0; }
+    .launch-avatar:not(.ready) .av-float { opacity: 0; }
 
     /* ─── Chat Area ────────────────────────────────────── */
     .chat-area {
@@ -300,6 +307,37 @@
     @keyframes tdot {
       0%, 60%, 100% { transform: translateY(0);    opacity: 0.35; }
       30%            { transform: translateY(-5px); opacity: 1;    }
+    }
+
+    /* Dots that follow another bot bubble belong to the same group: no second avatar,
+       tight spacing, and the previous bubble drops its timestamp until the group ends. */
+    .message.bot + .typing-wrap { margin-top: -16px; }
+    .message.bot + .typing-wrap .avatar { visibility: hidden; }
+    .message.bot:has(+ .typing-wrap) .msg-time { display: none; }
+
+    /* ─── Status line ("Searching...") ─────────────────── */
+    /* Plain text, no avatar. Shown first while the assistant works; dots are only used
+       between further bubbles. A darker highlight sweeps across the muted text. */
+    .status-wrap {
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1.4;
+    }
+    .status-text {
+      display: inline-block;
+      color: #64748b;   /* text/muted */
+      background: linear-gradient(100deg, #64748b 35%, #222830 50%, #64748b 65%) 100% 0 / 300% 100% no-repeat;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: statusSweep 1.8s linear infinite;
+    }
+    @keyframes statusSweep {
+      from { background-position: 100% 0; }
+      to   { background-position: 0% 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .status-text { animation: none; background: none; -webkit-text-fill-color: currentColor; }
     }
 
     /* ─── Input Area ───────────────────────────────────── */
@@ -1097,15 +1135,21 @@
   <div class="launch" id="launch" aria-hidden="true">
     <div class="launch-stack">
       <div class="launch-avatar" id="launchAvatar">
-        <svg viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <g class="av-ball av-orange"><circle cx="24.2" cy="26.4" r="11" fill="#F76710"/></g>
-          <g class="av-ball av-green"><circle cx="55" cy="26.4" r="19.8" fill="#9BCF6E"/></g>
-          <g class="av-bag"><path d="M79.2 79.2H8.8L13.2 26.4H74.8L79.2 79.2Z" fill="#014E4B"/></g>
-          <g class="av-eyes">
-            <circle cx="36.3" cy="53.9" r="3.3" fill="#F0FDFA"/>
-            <circle cx="51.7" cy="53.9" r="3.3" fill="#F0FDFA"/>
-          </g>
-        </svg>
+        <div class="av-y" id="avY">
+         <div class="av-scale" id="avScale">
+          <div class="av-float" id="avFloat">
+            <svg viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <g class="av-ball av-orange"><circle cx="24.2" cy="26.4" r="11" fill="#F76710"/></g>
+              <g class="av-ball av-green"><circle cx="55" cy="26.4" r="19.8" fill="#9BCF6E"/></g>
+              <g class="av-bag"><path d="M79.2 79.2H8.8L13.2 26.4H74.8L79.2 79.2Z" fill="#014E4B"/></g>
+              <g class="av-eyes">
+                <circle cx="36.3" cy="53.9" r="3.3" fill="#F0FDFA"/>
+                <circle cx="51.7" cy="53.9" r="3.3" fill="#F0FDFA"/>
+              </g>
+            </svg>
+          </div>
+         </div>
+        </div>
       </div>
       <p class="launch-tagline" id="launchTagline">Quickly check if you may qualify for SNAP benefits.</p>
     </div>
@@ -2182,6 +2226,21 @@ function showTyping(label) {
   scrollBottom();
 }
 
+// Status line: plain text with a sweeping highlight (no avatar, no bubble). Reuses the
+// #typing id so hideTyping() clears either indicator.
+function showSearching(label = 'Searching...') {
+  const wrap = document.createElement('div');
+  wrap.className = 'status-wrap';
+  wrap.id = 'typing';
+  wrap.setAttribute('role', 'status');
+  const text = document.createElement('span');
+  text.className = 'status-text';
+  text.textContent = label;
+  wrap.appendChild(text);
+  chatArea.appendChild(wrap);
+  scrollBottom();
+}
+
 function hideTyping() {
   const el = document.getElementById('typing');
   if (el) el.remove();
@@ -2655,7 +2714,7 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
             btn1.textContent = "I\u2019d like to speak with a UT Outpost advisor";
             btn1.addEventListener('click', () => {
               qrWrap3.querySelectorAll('.qr-btn').forEach(b => b.disabled = true);
-              showTyping();
+              showSearching();
               setTimeout(() => {
                 hideTyping();
                 const { wrap: wA, msgRow: mrA, bubbleText: btA } = createBotBubble();
@@ -2724,7 +2783,7 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
             btn3.textContent = 'Thanks, I understand.';
             btn3.addEventListener('click', () => {
               qrWrap3.querySelectorAll('.qr-btn').forEach(b => b.disabled = true);
-              showTyping();
+              showSearching();
               setTimeout(() => {
                 hideTyping();
                 const { wrap: wD, msgRow: mrD, bubbleText: btD } = createBotBubble();
@@ -2819,8 +2878,8 @@ async function callAPI(retryCount = 0) {
   loading = true;
   lockInput(true);
   setStopMode(true);
-  hideTyping();   // clear any existing typing bubble before showing a fresh one
-  showTyping();
+  hideTyping();   // clear any existing indicator before showing a fresh one
+  showSearching();
 
   const { wrap, msgRow, bubbleText } = createBotBubble();
   let raw        = '';
@@ -2989,7 +3048,7 @@ async function callAPI(retryCount = 0) {
       if (isRetryable && retryCount < 3) {
         await new Promise(r => setTimeout(r, 2000));
         hideTyping();
-        showTyping('Retrying...');
+        showSearching('Retrying...');
         await new Promise(r => setTimeout(r, 500)); // brief pause so label is visible
         callAPI(retryCount + 1);
         return;
@@ -3194,7 +3253,7 @@ async function handleUserMessage(text) {
   // Intercept "Start applying on TexasBenefits.com" — show pre-apply bubble, skip API
   if (text === 'Start applying on TexasBenefits.com') {
     history.push({ role: 'user', content: text });
-    showTyping();
+    showSearching();
     setTimeout(() => {
       hideTyping();
       const { wrap: wP, msgRow: mrP, bubbleText: btP } = createBotBubble();
@@ -3868,85 +3927,148 @@ new MutationObserver(muts => {
 // Orange then green produce-ball drop into the bag (bag squashes on each hit),
 // eyes glance left/right, hold, then the Avatar shrinks into the header and the
 // chat starts. Plays once per page load.
-const LAUNCH_HOLD_MS = 3000;   // pause after the eye movement, before the avatar moves up
+const LAUNCH_HOLD_MS = 1500;   // pause after the eye movement, before the avatar moves up
 
+// Spring easing as a CSS linear() curve (no library). Apple-style: `duration` is the
+// settling time in ms, `bounce` 0.1-0.3. Returns the easing string plus the point (0-1 of the
+// duration) where it first reaches the target, so impacts can be timed to the landing.
+const SPRING_OK = typeof CSS !== 'undefined' && CSS.supports && CSS.supports('animation-timing-function', 'linear(0, 1)');
+function spring(duration, bounce) {
+  const zeta = 1 - bounce;
+  const T = duration / 1000;
+  const w0 = Math.log(100) / (zeta * T);                 // envelope has decayed to 1% at T
+  const wd = w0 * Math.sqrt(1 - zeta * zeta);
+  const f = t => 1 - Math.exp(-zeta * w0 * t) * (Math.cos(wd * t) + (zeta * w0 / wd) * Math.sin(wd * t));
+  const N = 48, pts = [];
+  let first = 1;
+  for (let i = 0; i <= N; i++) {
+    const v = f(T * i / N);
+    pts.push(+v.toFixed(4));
+    if (first === 1 && i > 0 && v >= 1) first = i / N;
+  }
+  pts[N] = 1;
+  return SPRING_OK
+    ? { easing: `linear(${pts.join(', ')})`, first }
+    : { easing: 'cubic-bezier(0.23, 1, 0.32, 1)', first: 0.4 };
+}
+
+// Launch: the bag floats in, produce drops in on springs (orange, then green), the bag
+// squashes and rebounds on each hit, then hovers while the eyes glance
+// left/right. After the hold the avatar arcs up into the header and the chat starts.
 function runLaunch() {
-  const launch   = document.getElementById('launch');
-  const avatarEl = document.getElementById('launchAvatar');
-  const tagline  = document.getElementById('launchTagline');
-  const slot     = document.getElementById('avatarSlot');
-  const title    = document.getElementById('headerTitle');
-  const q = s => avatarEl.querySelector(s);
+  const $ = id => document.getElementById(id);
+  const launch = $('launch'), avatarEl = $('launchAvatar'), yEl = $('avY'), scaleEl = $('avScale'), floatEl = $('avFloat');
+  const tagline = $('launchTagline'), slot = $('avatarSlot'), title = $('headerTitle');
+  const part = sel => avatarEl.querySelector(sel);
+  const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
+  const EASE_IN_OUT = 'cubic-bezier(0.77, 0, 0.175, 1)';
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const wait = ms => new Promise(r => setTimeout(r, ms));
-  const anim = (el, kf, opt) => el.animate(kf, { fill: 'both', ...opt }).finished;
+  const anim = (el, kf, opt) => el.animate(kf, { fill: 'both', ...opt });
 
   const dock = () => {
-    avatarEl.getAnimations().forEach(a => a.cancel());   // drop the held "moved" transform before re-parenting
+    // Drop the layout-only transforms (position/float/shadow); the ball, bag and eye
+    // animations keep their end state so the parts stay visible in the header.
+    [avatarEl, yEl, scaleEl, floatEl].forEach(el => el.getAnimations().forEach(a => a.cancel()));
     slot.appendChild(avatarEl);
-    avatarEl.style.transform = '';
-    avatarEl.classList.add('docked');
+    avatarEl.classList.add('ready', 'docked');
     title.classList.add('visible');
     launch.classList.add('done');
   };
 
-  if (reduce) { qAll(); dock(); return Promise.resolve(); }
-  function qAll() { q('.av-orange').style.opacity = 1; q('.av-green').style.opacity = 1; }
+  if (reduce) {
+    part('.av-orange').style.opacity = 1;
+    part('.av-green').style.opacity = 1;
+    dock();
+    return Promise.resolve();
+  }
 
+  const DROP_MS = 600;
+  const dropSpring = spring(DROP_MS, 0.28);
   const drop = (el, delay) => anim(el, [
-    { transform: 'translateY(-150px)', opacity: 0, offset: 0,    easing: 'cubic-bezier(.5,0,1,.6)' },
-    { transform: 'translateY(-150px)', opacity: 1, offset: 0.01, easing: 'cubic-bezier(.5,0,1,.6)' },
-    { transform: 'translateY(0)',      opacity: 1, offset: 0.58, easing: 'cubic-bezier(0,.4,.5,1)' },
-    { transform: 'translateY(-12px)',  opacity: 1, offset: 0.76, easing: 'cubic-bezier(.5,0,1,.6)' },
-    { transform: 'translateY(0)',      opacity: 1, offset: 0.88, easing: 'cubic-bezier(0,.4,.5,1)' },
-    { transform: 'translateY(-3px)',   opacity: 1, offset: 0.95 },
+    { transform: 'translateY(-130px)', opacity: 0, offset: 0 },
+    { transform: 'translateY(-130px)', opacity: 1, offset: 0.04 },
     { transform: 'translateY(0)',      opacity: 1, offset: 1 }
-  ], { duration: 800, delay });
+  ], { duration: DROP_MS, delay, easing: dropSpring.easing });
 
-  const squash = (strength, delay) => anim(q('.av-bag'), [
-    { transform: 'scale(1,1)', offset: 0 },
-    { transform: `scale(${1 + 0.04 * strength},${1 - 0.07 * strength})`, offset: 0.25, easing: 'ease-out' },
-    { transform: `scale(${1 - 0.015 * strength},${1 + 0.025 * strength})`, offset: 0.6, easing: 'ease-in-out' },
-    { transform: 'scale(1,1)', offset: 1 }
-  ], { duration: 520, delay });
+  // Impact: quick squash (ease-out), then a spring rebound that overshoots into a small stretch.
+  const reboundSpring = spring(700, 0.3);
+  const squash = (strength, delay) => anim(part('.av-bag'), [
+    { transform: 'scale(1, 1)', offset: 0, easing: EASE_OUT },
+    { transform: `scale(${1 + 0.045 * strength}, ${1 - 0.08 * strength})`, offset: 0.13, easing: reboundSpring.easing },
+    { transform: 'scale(1, 1)', offset: 1 }
+  ], { duration: 700, delay });
 
-  const eyes = () => anim(q('.av-eyes'), [
-    { transform: 'translateX(0)',   offset: 0 },
-    { transform: 'translateX(-5px)', offset: 0.28, easing: 'ease-in-out' },
-    { transform: 'translateX(-5px)', offset: 0.4 },
-    { transform: 'translateX(5px)',  offset: 0.72, easing: 'ease-in-out' },
-    { transform: 'translateX(5px)',  offset: 0.82 },
+  // Idle hover: slow bob + a hint of tilt.
+  const startIdle = () => {
+    const base = { duration: 2400, direction: 'alternate', iterations: Infinity, easing: EASE_IN_OUT };
+    floatEl.animate([
+      { transform: 'translateY(0) rotate(0deg)' },
+      { transform: 'translateY(-3px) rotate(-0.5deg)' }
+    ], base);
+  };
+
+  // Glance: each move settles on a spring, with a short hold at each side.
+  const glanceSpring = spring(420, 0.2);
+  const eyes = () => anim(part('.av-eyes'), [
+    { transform: 'translateX(0)',    offset: 0,    easing: glanceSpring.easing },
+    { transform: 'translateX(-5px)', offset: 0.26 },
+    { transform: 'translateX(-5px)', offset: 0.40, easing: glanceSpring.easing },
+    { transform: 'translateX(5px)',  offset: 0.66 },
+    { transform: 'translateX(5px)',  offset: 0.78, easing: glanceSpring.easing },
     { transform: 'translateX(0)',    offset: 1 }
-  ], { duration: 1200, easing: 'ease-in-out' });
+  ], { duration: 1500 }).finished;
 
+  // Arc into the header: x eases, y springs ahead (so the path curves), scale springs in.
   const move = () => {
-    const from = avatarEl.getBoundingClientRect();
-    const to   = slot.getBoundingClientRect();
+    const from = avatarEl.getBoundingClientRect(), to = slot.getBoundingClientRect();
     const dx = to.left - from.left, dy = to.top - from.top, s = to.width / from.width;
-    anim(tagline, [{ opacity: 1 }, { opacity: 0 }], { duration: 250 });
-    anim(title,   [{ opacity: 0, transform: 'translateX(-8px)' }, { opacity: 1, transform: 'translateX(0)' }],
-         { duration: 400, delay: 250, easing: 'ease-out' });
-    return anim(avatarEl, [
-      { transform: 'translate(0,0) scale(1)' },
-      { transform: `translate(${dx}px,${dy}px) scale(${s})` }
-    ], { duration: 650, easing: 'cubic-bezier(.65,0,.25,1)' });
+
+    // Release the hover without a snap: ease the current bob offset back to rest.
+    const bob = getComputedStyle(floatEl).transform;
+    floatEl.getAnimations().forEach(a => a.cancel());
+    anim(floatEl, [{ transform: bob }, { transform: 'none' }], { duration: 350, easing: EASE_OUT });
+
+    // One straight path: position and size share one ease-in-out. Between the strong EASE_IN_OUT token
+    // (idles at both ends: too floaty) and a crisp 600ms curve (stops abruptly: too hard): gets going
+    // early, then takes ~250ms to settle into the header.
+    const MOVE_MS = 720;
+    const MOVE_EASE = 'cubic-bezier(0.5, 0, 0.2, 1)';
+    anim(tagline, [{ opacity: 1 }, { opacity: 0 }], { duration: 200, easing: EASE_OUT });
+    anim(title, [{ opacity: 0, translate: '-8px 0' }, { opacity: 1, translate: '0 0' }],
+         { duration: 450, delay: 220, easing: EASE_OUT });
+
+    return Promise.all([
+      anim(avatarEl, [{ translate: '0 0' }, { translate: `${dx}px 0` }], { duration: MOVE_MS, easing: MOVE_EASE }).finished,
+      anim(yEl, [{ translate: '0 0' }, { translate: `0 ${dy}px` }], { duration: MOVE_MS, easing: MOVE_EASE }).finished,
+      anim(scaleEl, [{ scale: '1' }, { scale: String(s) }], { duration: MOVE_MS, easing: MOVE_EASE }).finished
+    ]);
   };
 
   return (async () => {
     tagline.style.opacity = 0;
-    // orange lands at ~0.58 × 800ms ≈ 460ms after its start; green starts ~480ms later
-    drop(q('.av-orange'), 150);
-    squash(0.7, 150 + 460);
-    drop(q('.av-green'), 640);
-    squash(1, 640 + 460);
-    await wait(640 + 460 + 100);
-    anim(tagline, [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 450, easing: 'ease-out' });
-    await wait(700);
+    avatarEl.classList.add('ready');
+    anim(floatEl, [{ opacity: 0, translate: '0 10px', scale: '0.94' }, { opacity: 1, translate: '0 0', scale: '1' }],
+         { duration: 420, easing: EASE_OUT });
+
+    // Orange first; green follows before the orange has finished settling.
+    const orangeAt = 250, greenAt = 400;
+    drop(part('.av-orange'), orangeAt);
+    drop(part('.av-green'), greenAt);
+    const orangeLands = orangeAt + dropSpring.first * DROP_MS;
+    const greenLands = greenAt + dropSpring.first * DROP_MS;
+    squash(0.7, orangeLands);
+    squash(1, greenLands);
+
+    await wait(greenLands + 150);
+    startIdle();
+    anim(tagline, [{ opacity: 0, translate: '0 6px' }, { opacity: 1, translate: '0 0' }], { duration: 500, easing: EASE_OUT });
+    await wait(600);
     await eyes();
     await wait(LAUNCH_HOLD_MS);
     await move();
     dock();
-    await wait(250);
+    await wait(200);
   })();
 }
 
