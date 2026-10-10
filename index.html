@@ -76,6 +76,26 @@
     .header-blur i:nth-child(4) { --b: 2.8px; --m1: 25%; --m2: 60%; }
     .header-blur i:nth-child(5) { --b: 4.2px; --m1: 15%; --m2: 48%; }
     .header-blur i:nth-child(6) { --b: 5.6px; --m1: 5%;  --m2: 36%; }
+    /* Close button (top right). The header ignores pointer events so it never blocks the chat; the button opts back in. */
+    .close-btn {
+      margin-left: auto;
+      width: 40px;
+      height: 40px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 50%;
+      box-shadow: 0 6px 24px rgba(34, 40, 48, 0.12);
+      cursor: pointer;
+      pointer-events: auto;
+      transition: background 0.15s;
+    }
+    .close-btn:hover { background: #f8fafc; }
+    .close-btn:focus-visible { outline: 2px solid #107c77; outline-offset: 2px; }
+    .close-btn img { display: block; }
     .header-avatar-slot {
       width: 40px;
       height: 40px;
@@ -1159,6 +1179,7 @@
     <div class="header-blur" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
     <div class="header-avatar-slot" id="avatarSlot"></div>
     <div class="header-title" id="headerTitle">SNAP Assistant</div>
+    <button class="close-btn" id="closeBtn" type="button" aria-label="Close"><img src="assets/close.svg" alt="" width="24" height="24"></button>
   </header>
 
   <!-- Launch: Avatar drops in, bounces, looks around, then docks into the header -->
@@ -3956,6 +3977,14 @@ new MutationObserver(muts => {
     }
   }
 }).observe(chatArea, { childList: true, subtree: true });
+
+// ── Close button ────────────────────────────────────────────────────────────
+// The page does not decide what "close" means. It announces the request so whatever hosts the
+// assistant (a site embedding it in an iframe, or a later in-page wrapper) can react.
+document.getElementById('closeBtn').addEventListener('click', () => {
+  document.dispatchEvent(new CustomEvent('snap-assistant:close'));
+  if (window.parent !== window) window.parent.postMessage({ type: 'snap-assistant:close' }, '*');
+});
 
 // ── Rotating placeholder ────────────────────────────────────────────────────
 // Example questions the assistant handles well. Keep each short enough for one line.
