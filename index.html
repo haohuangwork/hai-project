@@ -83,7 +83,7 @@
     }
     .header-title {
       font-weight: 600;
-      font-size: 18px;
+      font-size: 16px;
       color: #222830;
       line-height: 1.2;
       white-space: nowrap;
@@ -385,6 +385,31 @@
     }
     .msg-input::placeholder { color: #475569; }
     .msg-input:disabled { opacity: 0.5; }
+
+    /* Rotating placeholder: sits over the empty textarea, same type as a real placeholder.
+       70% opacity; fades out as soon as the field is focused or has text. */
+    .input-field { position: relative; width: 100%; }
+    .ph-rotator {
+      position: absolute;
+      inset: 0 0 auto 0;
+      min-height: 24px;
+      pointer-events: none;
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 1.4;
+      color: #475569;
+      opacity: 0.7;
+      transition: opacity 150ms ease;
+    }
+    .ph-rotator.hidden { opacity: 0; }
+    .ph-text {
+      position: absolute;
+      inset: 0 0 auto 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .input-field:has(.msg-input:disabled) .ph-rotator:not(.hidden) { opacity: 0.35; }
 
     .input-actions {
       display: flex;
@@ -1166,13 +1191,17 @@
   <!-- Input Area -->
   <div class="input-area">
     <div class="input-card">
-      <textarea
-        class="msg-input"
-        id="msgInput"
-        placeholder="Type your message..."
-        rows="1"
-        disabled
-      ></textarea>
+      <div class="input-field">
+        <textarea
+          class="msg-input"
+          id="msgInput"
+          aria-label="Type your message"
+          rows="1"
+          disabled
+        ></textarea>
+        <!-- Rotating example questions; stands in for the native placeholder -->
+        <div class="ph-rotator" id="phRotator" aria-hidden="true"><span class="ph-text" id="phText">Type your message...</span></div>
+      </div>
       <div id="filePreview" class="file-preview"></div>
       <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp,application/pdf" style="display:none">
       <div class="input-actions">
@@ -3927,6 +3956,47 @@ new MutationObserver(muts => {
     }
   }
 }).observe(chatArea, { childList: true, subtree: true });
+
+// ── Rotating placeholder ────────────────────────────────────────────────────
+// Example questions the assistant handles well. Keep each short enough for one line.
+const PLACEHOLDER_QUESTIONS = [
+  'Type your message...',
+  'I got SNAP last year. Can I again?',
+  'Does my meal plan affect SNAP?'
+];
+(function initPlaceholderRotator() {
+  const box = document.getElementById('phRotator');
+  const text = document.getElementById('phText');
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const ROTATE_MS = 4500, OUT_MS = 280, IN_MS = 420;
+  let i = 0;
+
+  // Hidden while the field is focused (the user is active) or has text; returns when empty and blurred.
+  const covered = () => msgInput.value !== '' || document.activeElement === msgInput;
+  const sync = () => box.classList.toggle('hidden', covered());
+  ['input', 'focus', 'blur'].forEach(ev => msgInput.addEventListener(ev, sync));
+  setInterval(sync, 250);   // covers programmatic changes (clearing after send, voice input)
+
+  // One line at a time, sliding upward: the current question drifts up and fades out, the text is
+  // swapped while it is invisible, then the next one rises from below. Never two lines on screen,
+  // so nothing ghosts.
+  const EASE = 'cubic-bezier(0.23, 1, 0.32, 1)';
+  const swap = () => {
+    i = (i + 1) % PLACEHOLDER_QUESTIONS.length;
+    if (reduce) { text.textContent = PLACEHOLDER_QUESTIONS[i]; return; }
+    text.animate([{ opacity: 1, transform: 'translateY(0)' }, { opacity: 0, transform: 'translateY(-6px)' }],
+                 { duration: OUT_MS, easing: EASE, fill: 'forwards' }).finished.then(() => {
+      text.textContent = PLACEHOLDER_QUESTIONS[i];
+      text.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }],
+                   { duration: IN_MS, easing: EASE, fill: 'forwards' });
+    });
+  };
+
+  setInterval(() => {
+    if (document.hidden || msgInput.disabled || covered()) return;
+    swap();
+  }, ROTATE_MS);
+})();
 
 // ── Launch sequence ─────────────────────────────────────────────────────────
 // Orange then green produce-ball drop into the bag (bag squashes on each hit),
