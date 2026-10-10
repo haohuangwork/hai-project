@@ -83,7 +83,7 @@
     }
     .header-title {
       font-weight: 600;
-      font-size: 16px;
+      font-size: 18px;
       color: #222830;
       line-height: 1.2;
       white-space: nowrap;
@@ -1145,7 +1145,7 @@
 
       /* Input area — safe area for iPhone home bar */
       .input-area {
-        padding: 8px 16px env(safe-area-inset-bottom, 16px);
+        padding: 8px 16px max(8px, env(safe-area-inset-bottom, 8px));   /* never closer than 8px to the bottom */
       }
     }
   </style>
@@ -1181,7 +1181,7 @@
          </div>
         </div>
       </div>
-      <p class="launch-tagline" id="launchTagline">Quickly check if you may qualify for SNAP benefits.</p>
+      <p class="launch-tagline" id="launchTagline">Quickly check if you may qualify for<br>SNAP benefits.</p>
     </div>
   </div>
 
@@ -3969,7 +3969,7 @@ const PLACEHOLDER_QUESTIONS = [
   const text = document.getElementById('phText');
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const ROTATE_MS = 4500, OUT_MS = 280, IN_MS = 420;
-  let i = 0;
+  let i = 0, done = false, timer = null;
 
   // Hidden while the field is focused (the user is active) or has text; returns when empty and blurred.
   const covered = () => msgInput.value !== '' || document.activeElement === msgInput;
@@ -3986,23 +3986,37 @@ const PLACEHOLDER_QUESTIONS = [
     if (reduce) { text.textContent = PLACEHOLDER_QUESTIONS[i]; return; }
     text.animate([{ opacity: 1, transform: 'translateY(0)' }, { opacity: 0, transform: 'translateY(-6px)' }],
                  { duration: OUT_MS, easing: EASE, fill: 'forwards' }).finished.then(() => {
+      if (done) return;
       text.textContent = PLACEHOLDER_QUESTIONS[i];
       text.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }],
                    { duration: IN_MS, easing: EASE, fill: 'forwards' });
     });
   };
 
-  setInterval(() => {
+  timer = setInterval(() => {
     if (document.hidden || msgInput.disabled || covered()) return;
     swap();
   }, ROTATE_MS);
+
+  // The rotation only guides the first message. Once the user has sent something, stop for good and
+  // fall back to the plain "Type your message..." placeholder.
+  const stop = () => {
+    if (done) return;
+    done = true;
+    clearInterval(timer);
+    text.getAnimations().forEach(a => a.cancel());
+    text.textContent = PLACEHOLDER_QUESTIONS[0];
+    i = 0;
+  };
+  new MutationObserver(() => { if (chatArea.querySelector('.message.user')) stop(); })
+    .observe(chatArea, { childList: true });
 })();
 
 // ── Launch sequence ─────────────────────────────────────────────────────────
 // Orange then green produce-ball drop into the bag (bag squashes on each hit),
 // eyes glance left/right, hold, then the Avatar shrinks into the header and the
 // chat starts. Plays once per page load.
-const LAUNCH_HOLD_MS = 1500;   // pause after the eye movement, before the avatar moves up
+const LAUNCH_HOLD_MS = 1200;   // pause after the eye movement, before the avatar moves up
 
 // Spring easing as a CSS linear() curve (no library). Apple-style: `duration` is the
 // settling time in ms, `bounce` 0.1-0.3. Returns the easing string plus the point (0-1 of the
