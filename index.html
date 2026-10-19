@@ -1297,7 +1297,8 @@ Never mention Medicaid, Section 8, TANF, or other programs unless the user speci
 
 TONE:
 - Warm and friendly but professional
-- Never use filler phrases like "Of course!", "Absolutely!", "Great question!"
+- Never use filler phrases like "Of course!", "Absolutely!", "Great question!", "Great choice!", "That's helpful", "That's helpful context", "I want to be upfront"
+- Never say "Feel free to", "Keep in mind", "Let me know", "Before we...", or "Is there anything else I can help with?"
 - Use natural transitions: "Got it." / "Makes sense." / "That helps."
 - Contractions encouraged: you're, don't, let's, that's
 - NEVER use em dashes (the \u2014 character). Use commas or new sentences instead.
@@ -1631,16 +1632,16 @@ OPTIONS:["Yes, I have a school meal plan","No meal plan"]
 - Yes meal plan \u2192 go to Step 3b
 
 Step 3b \u2014 Meal plan level check:
-Ask: "Got it. Just to clarify \u2014 how many meals a week does your plan actually cover? A full week has 21 meals (3 meals \u00d7 7 days). If your plan covers more than half of those, it affects your SNAP eligibility."
+Ask: "Got it. Just to clarify, how many meals a week does your plan actually cover? A full week has 21 meals (3 meals \u00d7 7 days). If your plan covers more than half of those, it affects your SNAP eligibility."
 OPTIONS:["More than 10 meals a week (most meals covered)","10 meals or fewer a week (only some meals)","I\u2019m not sure how to count mine"]
 - More than 10 meals \u2192 Use INELIGIBLE_SPLIT format. Bubble 1: Explain the student meal plan rule \u2014 covering more than 50% of weekly meals (>10 of 21) makes a student ineligible for SNAP. Be empathetic. End with: [USDA FNS Meal Plans](https://www.fns.usda.gov/snap/clarification-meal-plans-institutions-higher-education). Bubble 2 is hardcoded by frontend. STOP.
-- 10 or fewer meals \u2192 "Good news \u2014 your meal plan only covers part of the week, so it doesn\u2019t block your eligibility. Let\u2019s keep going." \u2192 go to Step 4
-- Not sure \u2192 Explain: "Count each scheduled meal your plan provides per week \u2014 breakfast, lunch, and dinner each count as 1. If your plan covers 5 weekday lunches, that\u2019s 5 meals. If it covers breakfast and lunch on weekdays, that\u2019s 10 meals." Then re-ask with OPTIONS:["More than 10 meals a week (most meals covered)","10 meals or fewer a week (only some meals)"]
+- 10 or fewer meals \u2192 "Good news, your meal plan only covers part of the week, so it doesn\u2019t block your eligibility. Let\u2019s keep going." \u2192 go to Step 4
+- Not sure \u2192 Explain: "Count each scheduled meal your plan provides per week. Breakfast, lunch, and dinner each count as 1. If your plan covers 5 weekday lunches, that\u2019s 5 meals. If it covers breakfast and lunch on weekdays, that\u2019s 10 meals." Then re-ask with OPTIONS:["More than 10 meals a week (most meals covered)","10 meals or fewer a week (only some meals)"]
 
 Step 4 \u2014 Exemption check:
 OPTIONS:["I work 20+ hours per week","I have an approved work-study position","I have a dependent child","I have a documented disability","I receive TANF","None of these apply"]
 - None \u2192 Explain meal plan blocks eligibility. Suggest UT Outpost, Central Texas Food Bank, Student Emergency Services. End warmly. STOP.
-- "I have an approved work-study position" \u2192 Do NOT immediately grant the exemption. Clarify: "Work-study eligibility alone isn't enough under current rules \u2014 as of July 2023, you need to be approved for a specific position and plan to actually work. Have you been assigned a work-study job or accepted a specific position?" OPTIONS:["Yes, I have an approved work-study position","No, I just know the school offers it"]
+- "I have an approved work-study position" \u2192 Do NOT immediately grant the exemption. Clarify: "Work-study eligibility alone isn't enough under current rules. As of July 2023, you need to be approved for a specific position and plan to actually work. Have you been assigned a work-study job or accepted a specific position?" OPTIONS:["Yes, I have an approved work-study position","No, I just know the school offers it"]
   - Yes, approved position \u2192 "That qualifies you for the work-study exemption." \u2192 Set path = STUDENT_EXEMPT \u2192 go to PHASE 2
   - No, just eligible \u2192 Explain the exemption doesn't apply under current rules. Suggest UT Outpost, Central Texas Food Bank, Student Emergency Services. End warmly. STOP.
 - Any other exemption \u2192 "That exemption qualifies you to move forward." \u2192 Set path = STUDENT_EXEMPT \u2192 go to PHASE 2
@@ -1780,7 +1781,7 @@ Do NOT output OPTIONS after INELIGIBLE_SPLIT. Stop after the token.
 When user selects "I have more questions to ask UT Outpost advisor" \u2192 Output this EXACT format, no deviations:
 
 ADVISOR:1
-That's a great choice! The UT Outpost advisors are really knowledgeable and can walk you through everything in person. They'll be able to answer your questions and help you fill out the paperwork if needed.
+UT Outpost advisors can go through everything with you in person, answer your questions, and help with the paperwork.
 
 UT Outpost Details:
 - Location: Student Services Building (SSB), Ground Floor
@@ -2070,7 +2071,8 @@ function stripMarkdownLinks(text) {
     .replace(/\*\*([^*]+)\*\*/g, '$1')                        // **bold**
     .replace(/\*([^*]+)\*/g, '$1')                            // *italic*
     .replace(/HIGHLIGHT:(\$[\d,]+)/g, '$1')                   // HIGHLIGHT tag → plain amount
-    .replace(/\u2014/g, ',')                                  // em dash → comma
+    .replace(/\s*\u2014\s*/g, ', ')                            // em dash → comma (absorbs the spaces around it)
+    .replace(/\s+(?:\u2013|--)\s+/g, ', ')                    // " – " / " -- " used as a pause → comma
     .replace(/\s+\-\s+/g, ', ');                              // " - " dash → comma
 }
 
@@ -2086,7 +2088,8 @@ function renderHighlightText(container, rawText) {
     .replace(/\s*\[([^\]]+)\]\(https?:\/\/[^\)\s]+\)/g, '')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/\*([^*]+)\*/g, '$1')
-    .replace(/\u2014/g, ',')
+    .replace(/\s*\u2014\s*/g, ', ')
+    .replace(/\s+(?:\u2013|--)\s+/g, ', ')
     .replace(/\s+\-\s+/g, ', ');
   const parts = cleaned.split(/(HIGHLIGHT:\$[\d,]+)/);
   parts.forEach(part => {
@@ -2565,7 +2568,7 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
 
     // Intro paragraph
     const intro = document.createElement('p');
-    intro.textContent = "That's a great choice! The UT Outpost advisors are really knowledgeable and can walk you through everything in person. They'll be able to answer your questions and help you fill out the paperwork if needed.";
+    intro.textContent = "UT Outpost advisors can go through everything with you in person, answer your questions, and help with the paperwork.";
     bubbleText.appendChild(intro);
 
     // "UT Outpost Details:" label
@@ -2751,7 +2754,7 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
             bt3.innerHTML = '';
 
             const intro3 = document.createElement('p');
-            intro3.textContent = 'Is there anything else I can help with?';
+            intro3.textContent = 'Anything else you\'d like to ask?';
             bt3.appendChild(intro3);
 
             bt3.classList.remove('streaming');
@@ -2776,7 +2779,7 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
                 btA.innerHTML = '';
 
                 const introA = document.createElement('p');
-                introA.textContent = "That\u2019s a great choice! The UT Outpost advisors are really knowledgeable and can walk you through everything in person. They\u2019ll be able to answer your questions and help you fill out the paperwork if needed.";
+                introA.textContent = "UT Outpost advisors can go through everything with you in person, answer your questions, and help with the paperwork.";
                 btA.appendChild(introA);
 
                 const detA = document.createElement('p');
@@ -3320,7 +3323,7 @@ async function handleUserMessage(text) {
 
       const p2 = document.createElement('p');
       p2.style.marginTop = '0.75em';
-      p2.textContent = 'Before you go, a few things to keep in mind:';
+      p2.textContent = 'Before you go, a few things to know:';
       btP.appendChild(p2);
 
       const ol = document.createElement('ol');
@@ -3933,7 +3936,7 @@ function renderNoThanks() {
   p1.textContent = 'No problem. You can always come back when you\'re ready.';
   const p2 = document.createElement('p');
   p2.style.marginTop = '0.5em';
-  p2.textContent = 'Apply at YourTexasBenefits.com anytime — your situation hasn\'t changed.';
+  p2.textContent = 'Apply at YourTexasBenefits.com anytime. Your situation hasn\'t changed.';
   bubbleText.appendChild(p1);
   bubbleText.appendChild(p2);
 
@@ -3945,7 +3948,7 @@ function startChat() {
   history = [];
   resetSnapData();
 
-  const bubble1 = "Hi! I'm your SNAP Eligibility Assistant, here to help you figure out if you qualify. Feel free to ask about anything you're unsure of.";
+  const bubble1 = "Hi! I'm your SNAP Eligibility Assistant. I can help you figure out if you qualify, and you can ask about anything you're unsure of.";
   const bubble2 = "To make sure I give you the most accurate information, what state are you currently living in?";
 
   addGreetingBubble(bubble1);
