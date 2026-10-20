@@ -104,7 +104,7 @@
     .header-title {
       font-weight: 600;
       font-size: 18px;
-      color: #222830;
+      color: #15171c;
       line-height: 1.2;
       white-space: nowrap;
       opacity: 0;
@@ -137,7 +137,7 @@
       font-size: 14px;
       font-weight: 500;
       line-height: 1.4;
-      color: #222830;
+      color: #15171c;
       text-align: center;
       opacity: 0;
     }
@@ -194,7 +194,7 @@
       background: #ffffff;
       border: 1px solid #e2e8f0;
       border-radius: 16px;
-      padding: 12px 16px;
+      padding: 12px;   /* space/3 on all sides (Figma v1/Bubble/Bot) */
       flex: 1;
       display: flex;
       flex-direction: column;
@@ -203,13 +203,11 @@
       min-height: unset;
       overflow: visible;
     }
-    .message.bot .bubble.streaming-bubble .msg-time { display: none; }
 
     /* Consecutive bot messages read as one group: one avatar (first), 8px between
        bubbles, timestamp only on the last bubble. */
     .message.bot + .message.bot { margin-top: -16px; }            /* 24px chat gap → 8px */
     .message.bot + .message.bot .avatar { visibility: hidden; }   /* keeps the indent */
-    .message.bot:has(+ .message.bot) .msg-time { display: none; }
     @keyframes wordFadeIn {
       from { opacity: 0; }
       to   { opacity: 1; }
@@ -221,7 +219,7 @@
       font-size: 14px;
       font-weight: 400;
       line-height: 1.4;
-      color: #222830;
+      color: #15171c;
       word-break: break-word;
     }
     .meal-plan-hint {
@@ -235,20 +233,6 @@
       font-weight: 400;
     }
     .meal-plan-hint svg { flex-shrink: 0; margin-top: 1px; }
-    .msg-time {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      align-self: flex-end;
-      margin-left: auto;
-    }
-    .msg-time span {
-      font-size: 12px;
-      font-weight: 500;
-      color: #69737c;
-      letter-spacing: -0.06px;
-      white-space: nowrap;
-    }
     .check-icon { display: none; }   /* V1: no read receipts */
 
     /* User message */
@@ -263,7 +247,6 @@
       gap: 8px;
     }
     .message.user .bubble-text { color: #ffffff; }
-    .message.user .msg-time span { color: #aee8e6; }
 
     /* ─── Quick Replies ────────────────────────────────── */
     /* V1: options live inside the bot bubble, under the message text */
@@ -276,16 +259,16 @@
     }
     .qr-btn {
       width: 100%;
-      background: rgba(233,240,240,0.6);   /* bg/surface-2 */
-      border: 1px solid #dae1e1;
-      border-radius: 8px;
+      background: #ffffff;                 /* bg/surface-1 */
+      border: 1px solid #c6cbd3;
+      border-radius: 8px;                  /* radius/sm */
       min-height: 44px;
-      padding: 12px;
+      padding: 12px;                       /* space/3 */
       font-family: inherit;
       font-size: 14px;
       font-weight: 500;
       line-height: 1.3;
-      color: #222830;
+      color: #1c7a74;                      /* text/brand */
       cursor: pointer;
       text-align: left;
       display: flex;
@@ -294,8 +277,8 @@
       text-decoration: none;
       transition: background 0.15s;
     }
-    .qr-btn:hover:not(:disabled) { background: rgba(214,228,228,0.75); text-decoration: none; }
-    .qr-btn:hover, .qr-btn:visited, .qr-btn:active { color: #222830; text-decoration: none; }
+    .qr-btn:hover:not(:disabled) { background: #f0fdfa; text-decoration: none; }   /* bg/hover */
+    .qr-btn:hover, .qr-btn:visited, .qr-btn:active { color: #1c7a74; text-decoration: none; }
     .qr-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
     /* ─── Typing Indicator ─────────────────────────────── */
@@ -311,7 +294,7 @@
       background: #ffffff;
       border: 1px solid #e2e8f0;
       border-radius: 16px;
-      padding: 16px;
+      padding: 12px;   /* matches the bot bubble */
     }
     .typing-dot {
       width: 8px;
@@ -338,7 +321,6 @@
        tight spacing, and the previous bubble drops its timestamp until the group ends. */
     .message.bot + .typing-wrap { margin-top: -16px; }
     .message.bot + .typing-wrap .avatar { visibility: hidden; }
-    .message.bot:has(+ .typing-wrap) .msg-time { display: none; }
 
     /* ─── Status line ("Searching...") ─────────────────── */
     /* Plain text, no avatar. Shown first while the assistant works; dots are only used
@@ -351,7 +333,7 @@
     .status-text {
       display: inline-block;
       color: #64748b;   /* text/muted */
-      background: linear-gradient(100deg, #64748b 35%, #222830 50%, #64748b 65%) 100% 0 / 300% 100% no-repeat;
+      background: linear-gradient(100deg, #64748b 35%, #15171c 50%, #64748b 65%) 100% 0 / 300% 100% no-repeat;
       -webkit-background-clip: text;
       background-clip: text;
       -webkit-text-fill-color: transparent;
@@ -383,10 +365,15 @@
       display: flex;
       flex-direction: column;
       gap: 16px;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
+    /* Active: neutral gray border plus a soft green glow on top of the resting shadow (per Figma) */
     .input-card:focus-within {
-      border-color: #107c77;
+      border-color: #a1a6ae;
+      box-shadow:
+        0 2px 16px 1px rgba(16,124,119,0.08),     /* brand/primary glow */
+        0 12px 16px -4px rgba(16,24,40,0.08),
+        0 4px 6px -2px rgba(16,24,40,0.04);
     }
     .msg-input {
       width: 100%;
@@ -395,7 +382,7 @@
       font-family: inherit;
       font-size: 16px;
       font-weight: 400;
-      color: #222830;
+      color: #15171c;
       background: transparent;
       resize: none;
       min-height: 24px;
@@ -594,7 +581,7 @@
       margin: 0;
       padding-left: 21px;
       font-size: 14px;
-      color: #222830;
+      color: #15171c;
       line-height: 1.4;
     }
     .advisor-details li { margin: 0; }
@@ -606,7 +593,7 @@
     .apply-checklist {
       margin: 0.5em 0 0 1.2em;
       font-size: 14px;
-      color: #222830;
+      color: #15171c;
       line-height: 1.6;
     }
     .apply-cta-btn {
@@ -637,7 +624,7 @@
     .blist-section-label:first-of-type { margin-top: 8px; }
     .blist-section-list {
       font-size: 14px;
-      color: #222830;
+      color: #15171c;
       line-height: 1.6;
       padding-left: 16px;
       margin: 0 0 10px 0;
@@ -665,7 +652,7 @@
       margin: 4px 0 0 21px;
       padding: 0;
       font-size: 14px;
-      color: #222830;
+      color: #15171c;
       line-height: 1.4;
     }
     .benefit-list li {
@@ -688,7 +675,7 @@
       border-radius: 12px;
       padding: 4px 8px;
       font-size: 12px;
-      color: #222830;
+      color: #15171c;
     }
     .file-preview-item img {
       width: 40px;
@@ -703,7 +690,7 @@
       width: 20px;
       height: 20px;
       border-radius: 50%;
-      background: #222830;
+      background: #15171c;
       color: white;
       border: none;
       cursor: pointer;
@@ -766,11 +753,6 @@
       gap: 4px;
       align-items: center;
       width: 100%;
-    }
-    .sources-stack .msg-time {
-      flex: 1 0 0;
-      justify-content: flex-end;
-      align-self: auto;
     }
     .sources-chip {
       display: inline-flex;
@@ -842,7 +824,7 @@
     .sheet-title {
       font-size: 18px;
       font-weight: 500;
-      color: #222830;
+      color: #15171c;
       line-height: 1.4;
     }
     .sheet-close {
@@ -850,7 +832,7 @@
       height: 24px;
       border: none;
       background: none;
-      color: #222830;
+      color: #15171c;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -904,7 +886,7 @@
     .source-title {
       font-size: 16px;
       font-weight: 500;
-      color: #222830;
+      color: #15171c;
       line-height: 1.4;
       white-space: nowrap;
       overflow: hidden;
@@ -963,7 +945,7 @@
     .action-card-title {
       font-size: 14px;
       font-weight: 600;
-      color: #222830;
+      color: #15171c;
       line-height: 1.3;
     }
     .action-card-sub {
@@ -1020,7 +1002,7 @@
       border-color: #107c77;
     }
     .service-card-body { flex: 1; }
-    .service-card-title { font-size: 14px; font-weight: 600; color: #222830; line-height: 1.3; }
+    .service-card-title { font-size: 14px; font-weight: 600; color: #15171c; line-height: 1.3; }
     .service-card-dur { font-size: 12px; color: #69737c; margin-top: 2px; }
 
     /* ─── Booking: Inline Input ────────────────────────── */
@@ -1046,7 +1028,7 @@
       border-radius: 12px;
       font-family: inherit;
       font-size: 14px;
-      color: #222830;
+      color: #15171c;
       background: #ffffff;
       outline: none;
       transition: border-color 0.2s;
@@ -1099,7 +1081,7 @@
       min-width: 100px;
       flex-shrink: 0;
     }
-    .booking-summary-val { color: #222830; font-weight: 500; }
+    .booking-summary-val { color: #15171c; font-weight: 500; }
     .booking-complete-btn {
       display: block;
       width: calc(100% - 40px);
@@ -1159,10 +1141,6 @@
       }
 
       /* Quick reply buttons — larger tap targets, bigger text */
-      .qr-btn {
-        min-height: 48px;
-      }
-
       /* Input area — safe area for iPhone home bar */
       .input-area {
         padding: 8px 16px max(8px, env(safe-area-inset-bottom, 8px));   /* never closer than 8px to the bottom */
@@ -2056,11 +2034,9 @@ function attachCitations(raw, wrap, msgRow) {
   const citSources = parseCitations(raw);
   if (citSources.length === 0) return;
   const bubble = msgRow.querySelector('.bubble');
-  const timeEl  = bubble.querySelector('.msg-time');
   const stack = document.createElement('div');
   stack.className = 'sources-stack';
   stack.appendChild(buildSourcesChip(citSources));
-  stack.appendChild(timeEl);
   bubble.appendChild(stack);
 }
 
@@ -2218,10 +2194,6 @@ function addMessage(role, text, options = []) {
       <div class="avatar">SB</div>
       <div class="bubble">
         <p class="bubble-text"></p>
-        <div class="msg-time">
-          <span>${t}</span>
-          ${checkSVG('#94a3b8')}
-        </div>
       </div>`;
     const bubbleTextEl = msgRow.querySelector('.bubble-text');
     const paras = text.split('\n\n');
@@ -2256,10 +2228,6 @@ function addMessage(role, text, options = []) {
     wrap.innerHTML = `
       <div class="bubble">
         <p class="bubble-text"></p>
-        <div class="msg-time">
-          <span>${t}</span>
-          ${checkSVG('#aee8e6')}
-        </div>
       </div>`;
     wrap.querySelector('.bubble-text').textContent = text;
   }
@@ -2344,10 +2312,6 @@ function createBotBubble() {
     <div class="avatar" aria-hidden="true">SB</div>
     <div class="bubble streaming-bubble">
       <p class="bubble-text streaming" aria-label="Assistant is typing"></p>
-      <div class="msg-time" aria-hidden="true">
-        <span>${t}</span>
-        ${checkSVG('#94a3b8')}
-      </div>
     </div>`;
   wrap.appendChild(msgRow);
   return { wrap, msgRow, bubbleText: msgRow.querySelector('.bubble-text') };
@@ -2652,12 +2616,10 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
       { url: 'https://www.fns.usda.gov/snap/recipient/eligibility', title: 'USDA FNS Eligibility', domain: 'fns.usda.gov', context: 'SNAP eligibility requirements and income limits.' },
     ];
     const bubble = msgRow.querySelector('.bubble');
-    const timeEl  = bubble.querySelector('.msg-time');
-    const stack = document.createElement('div');
+      const stack = document.createElement('div');
     stack.className = 'sources-stack';
     stack.appendChild(buildSourcesChip(eligibleSources));
-    stack.appendChild(timeEl);
-    bubble.appendChild(stack);
+      bubble.appendChild(stack);
   } else if (text.includes('INELIGIBLE_SPLIT')) {
     // ── Ineligible result — three bubbles ────────────────────────────────────
     const splitIdx = text.indexOf('INELIGIBLE_SPLIT');
@@ -2713,7 +2675,7 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
           nameP.textContent = name;
           nameP.style.fontSize = '14px';
           nameP.style.fontWeight = '500';
-          nameP.style.color = '#222830';
+          nameP.style.color = '#15171c';
           nameP.style.margin = '0';
           block.appendChild(nameP);
 
@@ -3723,7 +3685,6 @@ function addGreetingBubble(text) {
     <div class="avatar">SB</div>
     <div class="bubble">
       <div class="bubble-text"></div>
-      <div class="msg-time"><span>${t}</span>${checkSVG('#94a3b8')}</div>
     </div>`;
   // Split on double newlines into paragraphs, no question-splitting logic
   const bubbleText = msgRow.querySelector('.bubble-text');
@@ -3750,7 +3711,7 @@ function renderSummaryBubble() {
   const title = document.createElement('p');
   title.textContent = 'SNAP Eligibility Summary';
   title.style.fontWeight = '600';
-  title.style.color = '#222830';
+  title.style.color = '#15171c';
   bubbleText.appendChild(title);
 
   // Status row
@@ -3782,7 +3743,7 @@ function renderSummaryBubble() {
     const li = document.createElement('li');
     li.textContent = item;
     li.style.fontSize = '14px';
-    li.style.color = '#222830';
+    li.style.color = '#15171c';
     ul.appendChild(li);
   });
   bubbleText.appendChild(ul);
@@ -3835,7 +3796,7 @@ function renderEmailInput() {
   const input = document.createElement('input');
   input.type = 'email';
   input.placeholder = 'your@email.com';
-  input.style.cssText = 'flex:1;height:40px;border:1px solid #e2e8f0;border-radius:8px;padding:0 12px;font-size:14px;font-family:inherit;color:#222830;background:#fff;outline:none;box-sizing:border-box';
+  input.style.cssText = 'flex:1;height:40px;border:1px solid #e2e8f0;border-radius:8px;padding:0 12px;font-size:14px;font-family:inherit;color:#15171c;background:#fff;outline:none;box-sizing:border-box';
   input.addEventListener('focus', () => { input.style.borderColor = '#014e4b'; });
   input.addEventListener('blur',  () => { if (input.style.borderColor !== '#e24b4a') input.style.borderColor = '#e2e8f0'; });
 
@@ -3976,7 +3937,10 @@ new MutationObserver(muts => {
     for (const qr of lists) {
       const bubble = qr.closest('.message.bot')?.querySelector('.bubble');
       if (!bubble || bubble.contains(qr)) continue;
-      bubble.insertBefore(qr, bubble.querySelector('.msg-time'));
+      // Options go after the message text and before the Sources row (if any). The anchor must be a
+      // direct child of the bubble, otherwise insertBefore throws and the options are left outside.
+      const bottomRow = [...bubble.children].find(c => c.matches('.sources-stack'));
+      bubble.insertBefore(qr, bottomRow || null);
     }
   }
 }).observe(chatArea, { childList: true, subtree: true });
