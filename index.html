@@ -275,11 +275,21 @@
       align-items: center;
       justify-content: flex-start;
       text-decoration: none;
-      transition: background 0.15s;
+      transition: background 0.15s, border-color 0.15s;
     }
-    .qr-btn:hover:not(:disabled) { background: #f0fdfa; text-decoration: none; }   /* bg/hover */
+    .qr-btn:hover:not(:disabled) { border-color: #107c77; text-decoration: none; }   /* hover: green outline only (brand/primary) */
     .qr-btn:hover, .qr-btn:visited, .qr-btn:active { color: #1c7a74; text-decoration: none; }
     .qr-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    /* Chosen option (Figma quickReply states=active): stays at full strength so it reads as the answer,
+       while the options that were not chosen fade. */
+    .qr-btn.selected,
+    .qr-btn.selected:disabled {
+      background: #f0fdfa;            /* bg/hover */
+      border-color: #b9dcd9;          /* border/brand-soft */
+      color: #1c7a74;                 /* text/brand */
+      opacity: 1;
+      cursor: default;
+    }
 
     /* ─── Typing Indicator ─────────────────────────────── */
     .typing-wrap {
@@ -3945,6 +3955,16 @@ new MutationObserver(muts => {
   }
 }).observe(chatArea, { childList: true, subtree: true });
 
+// ── Selected quick reply ────────────────────────────────────────────────────
+// Every flow disables the whole option group on click. Capture the click first and mark the chosen
+// button so it can keep the "active" look while the others dim. Links (advisor booking) are left alone.
+chatArea.addEventListener('click', e => {
+  const btn = e.target.closest?.('button.qr-btn');
+  if (!btn || btn.disabled || !btn.closest('.quick-replies')) return;
+  btn.classList.add('selected');
+  btn.setAttribute('aria-pressed', 'true');
+}, true);
+
 // ── Close button ────────────────────────────────────────────────────────────
 // The page does not decide what "close" means. It announces the request so whatever hosts the
 // assistant (a site embedding it in an iframe, or a later in-page wrapper) can react.
@@ -4047,7 +4067,9 @@ function runLaunch() {
   const part = sel => avatarEl.querySelector(sel);
   const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
   const EASE_IN_OUT = 'cubic-bezier(0.77, 0, 0.175, 1)';
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // ?nolaunch=1 skips the drop-in (intro.html embeds the app and shows its own logo beat).
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    || new URLSearchParams(location.search).has('nolaunch');
   const wait = ms => new Promise(r => setTimeout(r, ms));
   const anim = (el, kf, opt) => el.animate(kf, { fill: 'both', ...opt });
 
@@ -4159,7 +4181,229 @@ function runLaunch() {
 
 msgInput.disabled = false;
 lockInput(true);                 // keep the composer inert until the intro finishes
-runLaunch().then(startChat);
+// In demo mode with a launch beat (feature 1), the drop-in waits for the stage to say 'start'
+// so the recording begins on the first frame of the launch animation.
+const demoParams = new URLSearchParams(location.search);
+const demoHosted = demoParams.has('demo') && window.parent !== window;
+const launchGate = demoHosted && !demoParams.has('nolaunch')
+  ? new Promise(res => {
+      window.parent.postMessage({ type: 'snap-demo:ready' }, '*');
+      addEventListener('message', function on(e) {
+        if (e.data && e.data.type === 'snap-demo:start') { removeEventListener('message', on); res(); }
+      });
+    })
+  : Promise.resolve();
+const launchDone = launchGate.then(runLaunch).then(startChat);
+
+// ── Demo scenarios (?demo=<name>) ──────────────────────────────────────────────
+// Scripted takes for the portfolio clips (one per feature). Each scenario seeds earlier turns
+// instantly, then plays its steps through the normal UI code paths: typing goes through the
+// composer, clicks go through the real buttons, replies render with createBotBubble +
+// finalizeMessage. No API traffic. The stage page (demo.html) hosts this in an iframe and
+// draws the cursor; the handshake is postMessage both ways:
+//   child → parent: ready | cursor {x,y,press} | done
+//   parent → child: start | go
+(function initDemoMode() {
+  const name = demoParams.get('demo');
+  if (!name) return;
+  const remote = window.parent !== window;
+  const tell = (type, extra) => { if (remote) window.parent.postMessage({ type: 'snap-demo:' + type, ...extra }, '*'); };
+  const until = type => new Promise(res => {
+    const on = e => { if (e.data && e.data.type === 'snap-demo:' + type) { window.removeEventListener('message', on); res(e.data); } };
+    window.addEventListener('message', on);
+  });
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
+
+  const SRC_ELIG = '[USDA FNS SNAP Eligibility](https://www.fns.usda.gov/snap/recipient/eligibility)';
+  const SRC_STUDENTS = '[USDA FNS Students](https://www.fns.usda.gov/snap/students)';
+  const EXEMPTION_Q = 'Students enrolled at least half-time usually need to meet an exemption. Do any of these apply to you?\n\n' +
+    'OPTIONS:["I have a dependent child under 18","I have an approved work-study position","I have a documented disability","I receive TANF","None of these apply"]';
+  const SEED_STUDENT = [
+    { user: "I'm a UT student living alone, making about $1,200 a month." },
+    { bot: 'Thanks, that helps. For a 1-person household the gross income limit is $1,696 a month, so your income is under the limit.' },
+    { bot: EXEMPTION_Q },
+  ];
+
+  const SCENARIOS = {
+    // Feature 1: free-form question, assistant asks about hours instead of starting at question 1.
+    freeform: {
+      steps: [
+        { pause: 600 },
+        { type: 'My work hours dropped. Do I still qualify?', cps: 11 },
+        { pause: 350 },
+        { click: 'send', reply: {
+          status: ['Searching...', 'Checking work hour rules...'],
+          text: 'Sorry to hear your hours were cut. For students, the 20-hour-a-week work exemption is based on your average hours, so a drop can change things.\n\n' +
+                'How many hours a week are you working now?' } },
+        { pause: 1800 },
+      ],
+    },
+    // Feature 2: reply with the $1,696 limit, cursor opens the Sources sheet, end with it open.
+    sources: {
+      seed: [{ user: 'I live alone and make about $1,400 a month.' }],
+      steps: [
+        { pause: 500 },
+        { reply: {
+          status: ['Searching...', 'Checking income limits...'],
+          text: 'Since you buy and cook on your own, your household size is 1. The gross income limit for a 1-person household is $1,696 a month, so $1,400 is under the limit.\n\n' +
+                'Are you enrolled at least half-time right now?\n\n' + SRC_ELIG } },
+        { pause: 900 },
+        { click: 'chip' },
+        { pause: 2200 },
+      ],
+    },
+    // Feature 4a: last question answered, eligible card with amount, checklist and buttons staggered in.
+    eligible: {
+      seed: SEED_STUDENT,
+      steps: [
+        { pause: 700 },
+        { click: { option: 'I have an approved work-study position' }, reply: {
+          status: ['Searching...', 'Checking student exemptions...'], stagger: 260,
+          text: "Based on what you've shared, you're likely eligible for SNAP.\n\nAMOUNT:$298\n\n" +
+                "Your actual benefit depends on your income and expenses. To apply, you'll need:\n" +
+                'LIST:\n1. Proof of income (pay stub or financial aid letter)\n2. Your Social Security Number\n3. Bank statements (if applicable)\nEND_LIST\n' +
+                'OPTIONS:["Start applying on TexasBenefits.com","I have more questions to ask UT Outpost advisor","I\'ll apply later"]' } },
+        { pause: 2400 },
+      ],
+    },
+    // Feature 4b: same last question, "None of these apply", ineligible bubbles and resources.
+    ineligible: {
+      seed: SEED_STUDENT,
+      steps: [
+        { pause: 700 },
+        { click: { option: 'None of these apply' }, reply: {
+          status: ['Searching...', 'Checking student exemptions...'],
+          text: "Based on what you've shared, you may not qualify for SNAP right now.\n\n" +
+                'Students enrolled at least half-time need to meet at least one exemption, such as working 20 hours a week or an approved work-study position, to be eligible. ' + SRC_STUDENTS +
+                '\n\nINELIGIBLE_SPLIT' } },
+        { pause: 5200 },
+      ],
+    },
+    // Feature 3 (before): the income question answered by typing the exact figure. Static; the
+    // answer stays in the composer.
+    privacyBefore: {
+      seed: [
+        { user: "Texas. It's just me in my household." },
+        { bot: "Thanks. What's your household's monthly income before taxes, from all sources like wages, benefits, or financial support?" },
+      ],
+      steps: [{ pause: 300 }, { type: '$1,400 from my part-time job', cps: 40 }, { pause: 600 }],
+    },
+    // Feature 3 (after): the limit is shared first and the student only says how they compare.
+    privacy: {
+      seed: [
+        { user: "Texas. It's just me in my household." },
+        { bot: 'For a 1-person household, the gross monthly income limit is HIGHLIGHT:$1,696 before taxes.\n\n' +
+               'How does your income compare?\n\n' +
+               'OPTIONS:["Below that limit","Around that limit","Clearly above that limit"]' },
+      ],
+      steps: [{ pause: 1000 }],
+    },
+  };
+  const scenario = SCENARIOS[name];
+  if (!scenario) return;
+
+  // No scrollbars in the recordings (the chat scrolls as replies come in).
+  const demoStyle = document.createElement('style');
+  demoStyle.textContent = '#chatArea, .sheet-body { scrollbar-width: none; } #chatArea::-webkit-scrollbar, .sheet-body::-webkit-scrollbar { display: none; }';
+  document.head.appendChild(demoStyle);
+
+  // Replace the two network calls on the send path. Language detection answers English so
+  // handleUserMessage falls through to callAPI, which here renders the step's canned reply.
+  let pendingReply = null, replyFinished = null;
+  detectLanguage = async () => 'english';
+  callAPI = async () => {
+    const reply = pendingReply; pendingReply = null;
+    loading = true; lockInput(true); setStopMode(true);
+    for (const [i, label] of (reply.status || ['Searching...']).entries()) {
+      hideTyping(); showSearching(label); await wait(i === 0 ? 750 : 650);
+    }
+    hideTyping();
+    const { wrap, msgRow, bubbleText } = createBotBubble();
+    chatArea.appendChild(wrap);
+    finalizeMessage(wrap, msgRow, bubbleText, reply.text);
+    await wait(0);   // let the quick-replies observer move the buttons into the bubble
+    await revealParts(msgRow.querySelector('.bubble'), reply.stagger || 320);
+    scrollBottom();
+    replyFinished && replyFinished();
+  };
+
+  // Reveal a bubble's blocks one after another (paragraphs, amount, list, buttons, Sources row).
+  async function revealParts(bubble, gap) {
+    const text = bubble.querySelector('.bubble-text');
+    const parts = [...(text ? text.children : []), ...[...bubble.children].filter(c => c !== text)];
+    if (reduce || parts.length === 0) return;
+    parts.forEach(el => { el.style.opacity = '0'; });
+    for (const el of parts) {
+      el.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'translateY(0)' }],
+                 { duration: 420, easing: EASE_OUT, fill: 'forwards' });
+      scrollBottom();
+      await wait(gap);
+    }
+  }
+
+  // Earlier turns, rendered instantly through the normal bubble code (no animation).
+  async function seed(turns) {
+    for (const t of turns) {
+      if (t.user) { addMessage('user', t.user); history.push({ role: 'user', content: t.user }); continue; }
+      const { wrap, msgRow, bubbleText } = createBotBubble();
+      chatArea.appendChild(wrap);
+      finalizeMessage(wrap, msgRow, bubbleText, t.bot);
+      history.push({ role: 'assistant', content: t.bot });
+    }
+    chatArea.querySelectorAll('.message').forEach(m => m.getAnimations({ subtree: true }).forEach(a => a.finish()));
+    await wait(0);   // the quick-replies observer has moved any buttons into their bubble by now
+    scrollBottom(); await wait(120); scrollBottom();
+  }
+
+  function target(click) {
+    if (click === 'send') return sendBtn;
+    if (click === 'chip') { const chips = chatArea.querySelectorAll('.sources-chip'); return chips[chips.length - 1]; }
+    if (click.option) return [...chatArea.querySelectorAll('.qr-btn')].reverse().find(b => b.textContent.trim() === click.option);
+  }
+
+  // Ask the stage to bring the cursor to an element, wait for its click beat, then click for real.
+  async function cursorClick(el) {
+    scrollBottom(); await wait(60); scrollBottom();   // the target must be on screen before the cursor lands
+    const r = el.getBoundingClientRect();
+    if (remote) {
+      tell('cursor', { x: r.left + r.width * 0.55, y: r.top + r.height * 0.55 });
+      await until('go');
+    } else await wait(500);
+    el.click();
+  }
+
+  async function run() {
+    await launchDone;
+    while (msgInput.disabled) await wait(50);   // startChat unlocks the composer after the greeting
+    if (scenario.seed) await seed(scenario.seed);
+    if (!remote || demoParams.has('nolaunch')) {   // launch takes come in through launchGate instead
+      tell('ready');
+      if (remote) await until('start');
+    }
+    const typed = () => msgInput.dispatchEvent(new Event('input', { bubbles: true }));
+    for (const step of scenario.steps) {
+      if (step.pause) await wait(step.pause);
+      if (step.type) {
+        msgInput.focus();
+        if (reduce) { msgInput.value = step.type; typed(); }
+        else for (const ch of step.type) {
+          msgInput.value += ch; typed();
+          await wait(1000 / (step.cps || 14) + (Math.random() * 2 - 1) * 35);
+        }
+      }
+      if (step.reply) { pendingReply = step.reply; }
+      const finished = step.reply ? new Promise(res => { replyFinished = res; }) : null;
+      if (step.click) await cursorClick(target(step.click));
+      else if (step.reply) await callAPI();
+      if (finished) await finished;
+    }
+    tell('done');
+    window.__demoDone = true;
+  }
+  run();
+})();
 </script>
 </body>
 </html>
