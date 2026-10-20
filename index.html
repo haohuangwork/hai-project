@@ -248,7 +248,7 @@
       gap: 8px;
     }
     .message.user .bubble-text { color: #ffffff; }
-    .amt { font-weight: 600; }   /* dollar amounts mentioned inside a message */
+    .amt { font-weight: 700; }   /* dollar amounts mentioned inside a message (Figma: Bold) */
 
     /* ─── Quick Replies ────────────────────────────────── */
     /* V1: options live inside the bot bubble, under the message text */
@@ -635,7 +635,7 @@
     }
     .blist-section-label:first-of-type { margin-top: 8px; }
     .blist-section-list {
-      font-size: 14px;
+      font-size: 16px;
       color: #15171c;
       line-height: 1.6;
       padding-left: 16px;
@@ -663,7 +663,7 @@
     .benefit-list {
       margin: 4px 0 0 21px;
       padding: 0;
-      font-size: 14px;
+      font-size: 16px;
       color: #15171c;
       line-height: 1.4;
     }
@@ -2712,7 +2712,7 @@ function finalizeMessage(wrap, msgRow, bubbleText, raw) {
 
           const descP = document.createElement('p');
           descP.textContent = desc;
-          descP.style.fontSize = '13px';
+          descP.style.fontSize = '14px';   // per Figma: description 14px, link stays 13px
           descP.style.color = '#64748b';
           descP.style.margin = '2px 0 0';
           block.appendChild(descP);
@@ -3742,14 +3742,12 @@ function renderSummaryBubble() {
   const title = document.createElement('p');
   title.textContent = 'SNAP Eligibility Summary';
   title.style.fontWeight = '600';
-  title.style.fontSize = '14px';   // summary card stays 14px until its size is decided
   title.style.color = '#15171c';
   bubbleText.appendChild(title);
 
   // Status row
   const statusP = document.createElement('p');
   statusP.style.marginTop = '6px';
-  statusP.style.fontSize = '14px';
   statusP.appendChild(document.createTextNode('Your status: '));
   const statusSpan = document.createElement('span');
   statusSpan.textContent = snapData.eligibilityStatus || 'very likely eligible';
@@ -3761,7 +3759,6 @@ function renderSummaryBubble() {
   // Bullet list
   const ul = document.createElement('ul');
   ul.style.paddingLeft = '21px';
-  ul.style.fontSize = '14px';
   ul.style.marginTop = '8px';
   ul.style.display = 'flex';
   ul.style.flexDirection = 'column';
@@ -3775,8 +3772,7 @@ function renderSummaryBubble() {
 
   items.forEach(item => {
     const li = document.createElement('li');
-    li.textContent = item;
-    li.style.fontSize = '14px';
+    appendRich(li, item);   // amounts such as $298 are Bold, per Figma
     li.style.color = '#15171c';
     ul.appendChild(li);
   });
