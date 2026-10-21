@@ -2083,8 +2083,7 @@ function renderHighlightText(container, rawText) {
     if (m) {
       const span = document.createElement('span');
       span.textContent = m[1];
-      span.style.color = '#107c77';
-      span.style.fontWeight = '600';
+      span.className = 'amt';   // dark Bold like every other amount in a message; only the result figure is green
       container.appendChild(span);
     } else if (part) {
       appendRich(container, part);
@@ -2403,7 +2402,7 @@ const PARA_STARTERS = [
 /**
  * Formats a conversational bot response into auto-paragraphed <p> elements
  * and renders them into `bubbleText`. HIGHLIGHT:$XXX tags are rendered inline
- * as teal spans via renderHighlightText().
+ * as bold amount spans via renderHighlightText().
  *
  * Falls back to plain text if the response is a defined/structured bubble.
  */
