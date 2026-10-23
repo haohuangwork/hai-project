@@ -40,6 +40,11 @@
       position: relative;
     }
 
+    /* Desktop shows the app inside an iPhone frame (Figma "Desktop version"). On phones the
+       wrappers drop out of layout, so the app stays full screen. */
+    .device, .device-screen { display: contents; }
+    .device-glow, .device-statusbar { display: none; }
+
     /* ─── Header (floats over chat; progressive blur) ─── */
     .header {
       position: absolute;
@@ -1141,10 +1146,83 @@
         padding: 8px 16px max(8px, env(safe-area-inset-bottom, 8px));   /* never closer than 8px to the bottom */
       }
     }
+
+    /* ─── Desktop: app in a phone frame ─────────────────── */
+    @media (min-width: 768px) {
+      body {
+        background: #eff1f2;
+        align-items: center;
+      }
+      /* Soft glow below the phone: the blurred gradient ellipse from the Figma frame */
+      .device-glow {
+        display: block;
+        position: fixed;
+        left: 50%; top: 50%;
+        width: 1391px; height: 1450px;
+        margin: -725px 0 0 -695.5px;
+        translate: 0 calc(375px * var(--device-scale, 1));
+        scale: var(--device-scale, 1);
+        border-radius: 50%;
+        background: linear-gradient(180deg, rgba(248, 250, 252, 0.7) 0%, rgba(201, 227, 228, 0.49) 100%);
+        filter: blur(150px);
+        pointer-events: none;
+      }
+      /* 412×862 with an 11px bezel; --device-scale shrinks it to fit short windows (set in JS) */
+      .device {
+        display: block;
+        position: relative;
+        flex-shrink: 0;
+        width: 412px; height: 862px;
+        padding: 11px;
+        border-radius: 64px;
+        background: #000;
+        scale: var(--device-scale, 1);
+      }
+      /* The transform makes this the containing block for the fixed sheet and overlay */
+      .device-screen {
+        display: block;
+        position: relative;
+        width: 390px; height: 840px;
+        border-radius: 58px;
+        overflow: hidden;
+        background: #f8fafc;
+        transform: translateZ(0);
+      }
+      .device-statusbar {
+        display: block;
+        position: relative;
+        height: 52px;
+        background: #f8fafc;
+      }
+      .device-statusbar img { position: absolute; display: block; }
+      .device-island { left: 139px; top: 12px; }
+      .device-icons  { left: 49px; top: 16px; }
+      .app {
+        width: 390px;
+        max-width: none;
+        height: 788px;
+        box-shadow: none;
+      }
+      .sheet {
+        left: 0;
+        width: 100%;
+        max-width: none;
+        max-height: 70%;
+        transform: translateY(100%);
+      }
+      .sheet.open { transform: translateY(0); }
+    }
   </style>
   <script type="text/javascript">(function(u,x,t,w,e,a,k,s){a=function(v){try{u.setItem(t+e,v)}catch(e){}v=JSON.parse(v);for(k=0;k<v.length;k++){s=x.createElement("script");s.text="(function(u,x,t,w,e,a,k){a=u[e]=function(){a.q.push(arguments)};a.q=[];a.t=+new Date;a.c=w;k=x.createElement('script');k.async=1;k.src=t;x.getElementsByTagName('head')[0].appendChild(k)})(window,document,'"+v[k].u+"',"+JSON.stringify(v[k].c)+",'"+v[k].g+"')";x.getElementsByTagName("head")[0].appendChild(s)}};try{k=u.getItem(t+e)}catch(e){}if(k){return a(k)}k=new XMLHttpRequest;k.onreadystatechange=function(){if(k.readyState==4&&k.status==200)a(k.responseText)};k.open("POST",w+e);k.send(x.URL)})(sessionStorage,document,"uxt:","https://api.uxtweak.com/snippet/","c7b469fa-9629-4371-855f-c3f70d658e44");</script>
 </head>
 <body>
+<div class="device-glow" aria-hidden="true"></div>
+<div class="device">
+<div class="device-screen">
+<div class="device-statusbar" aria-hidden="true">
+  <img class="device-island" src="assets/device-island.svg" alt="" width="111" height="31">
+  <img class="device-icons" src="assets/device-status-icons.svg" alt="" width="293" height="22">
+</div>
 <div class="app">
 
   <!-- Header -->
@@ -1234,7 +1312,8 @@
 
 </div>
 
-<!-- Sources bottom sheet (outside .app so it overlays the full viewport) -->
+<!-- Sources bottom sheet (outside .app so it overlays the whole screen: the viewport on phones,
+     the phone frame on desktop) -->
 <div id="sheetOverlay" class="sheet-overlay" style="display:none" aria-hidden="true"></div>
 <div id="sourceSheet" class="sheet" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
   <div class="sheet-header">
@@ -1245,9 +1324,23 @@
   </div>
   <div class="sheet-body" id="sheetBody"></div>
 </div>
+</div><!-- /.device-screen -->
+</div><!-- /.device -->
 
 <script>
 'use strict';
+
+// ── Desktop phone frame ────────────────────────────────────────────────────────
+// On desktop the app sits in an 862px-tall phone; shrink it to fit shorter windows (48px margin).
+(function fitDevice() {
+  const desktop = window.matchMedia('(min-width: 768px)');
+  const fit = () => {
+    const k = desktop.matches ? Math.min(1, (innerHeight - 48) / 862, (innerWidth - 48) / 412) : 1;
+    document.documentElement.style.setProperty('--device-scale', k.toFixed(4));
+  };
+  addEventListener('resize', fit);
+  fit();
+})();
 
 // ── System Prompt ──────────────────────────────────────────────────────────────
 const SYSTEM_PROMPT = `OUTPUT FORMAT: Plain text only. No markdown. No ## headers. No ** bold. No bullet points with -. No --- dividers. Every response about SNAP policy MUST end with a citation link: [Source Name](URL)
@@ -4117,7 +4210,8 @@ function runLaunch() {
   // Arc into the header: x eases, y springs ahead (so the path curves), scale springs in.
   const move = () => {
     const from = avatarEl.getBoundingClientRect(), to = slot.getBoundingClientRect();
-    const dx = to.left - from.left, dy = to.top - from.top, s = to.width / from.width;
+    const k = launch.getBoundingClientRect().width / launch.offsetWidth || 1;   // desktop phone-frame scale
+    const dx = (to.left - from.left) / k, dy = (to.top - from.top) / k, s = to.width / from.width;
 
     // Release the hover without a snap: ease the current bob offset back to rest.
     const bob = getComputedStyle(floatEl).transform;
